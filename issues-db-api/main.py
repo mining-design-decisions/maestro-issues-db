@@ -81,23 +81,23 @@ async def save_predictions(request: Request):
 @app.patch('/add-tags')
 async def add_tags(request: Request):
     data = await request.json()
-    for item in data:
+    for key in data:
         # Get the current list of tags of this issue
         issue = collection.find_one(
-            {'_id': item['key']},
+            {'_id': key},
             ['tags']
         )
         tags = issue['tags']
 
         # Add the new tags
-        for tag in item['tags']:
+        for tag in data[key]:
             # Only add non-existing tags
             if tag not in tags:
                 tags.append(tag)
         
         # Update entry with the new tags
         collection.update_one(
-            {'_id': item['key']},
+            {'_id': key},
             {'$set': {'tags': tags}}
         )
     # TODO: what to do with error handling here?
