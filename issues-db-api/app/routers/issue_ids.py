@@ -42,10 +42,6 @@ def validate_filter(query, *, __force_eq=False):
             if not isinstance(operand, dict):
                 raise _invalid_query('tag operand must be an object')
             validate_filter(operand, __force_eq=True)
-        case {'project': operand}:
-            if not isinstance(operand, dict):
-                raise _invalid_query('project operand must be an object')
-            validate_filter(operand, __force_eq=True)
         case {'$eq': operand}:
             if not __force_eq:
                 raise _invalid_query(query, '$eq not expected here')
@@ -66,31 +62,29 @@ def _invalid_query(q, msg=None):
     return ValueError(f'Invalid (sub-)query: {q}')
 
 
-class IssueKeysIn(BaseModel):
+class IssueIdsIn(BaseModel):
     filter: dict
 
     class Config:
         schema_extra = example_request
 
 
-class IssueKeysOut(BaseModel):
-    keys: list[str] = []
+class IssueIdsOut(BaseModel):
+    ids: list[str] = []
 
 
-@router.get('/issue-keys')
-def issue_keys(request: IssueKeysIn) -> IssueKeysOut:
+@router.get('/issue-ids')
+def issue_keys(request: IssueIdsIn) -> IssueIdsOut:
     """
-    Returns the issue keys for which the issue tags match
+    Returns the issue ids for which the issue tags match
     the provided filtering options. These filtering options are
     given in the body of the request.
-    TODO: Fix input validation
     """
     validate_filter(request.filter)
     issues = manual_labels_collection.find(
         request.filter,
-        ['key']
+        ['_id']
     )
-    response = IssueKeysOut()
-    response.keys = [issue['key'] for issue in issues]
-    print(response.keys)
+    response = IssueIdsOut()
+    response.ids = [issue['_id'] for issue in issues]
     return response

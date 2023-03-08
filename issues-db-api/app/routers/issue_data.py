@@ -6,9 +6,9 @@ from app.dependencies import jira_repos_db
 router = APIRouter()
 example_request = {
     "example": {
-        'keys': [
-            'ISSUE-1',
-            'ISSUE-2'
+        'ids': [
+            'ISSUE-ID-1',
+            'ISSUE-ID-2'
         ],
         'attributes': [
             'summary',
@@ -33,7 +33,7 @@ default_value = {
 
 
 class IssueDataIn(BaseModel):
-    keys: list[str]
+    ids: list[str]
     attributes: list[str]
 
     class Config:
@@ -48,28 +48,37 @@ class IssueDataOut(BaseModel):
 def issue_data(request: IssueDataIn) -> IssueDataOut:
     """
     Returns issue data. The returned data is determined by the
-    specified issue keys and the attributes that are requested.
+    specified issue ids and the attributes that are requested.
     """
-    issues = []
-    for repo in jira_repos_db.list_collection_names():
-        repo_issues = jira_repos_db[repo].find(
-            {'key': {'$in': request.keys}},
-            ['key'] + [f'fields.{attr}' for attr in request.attributes]
-        )
-        issues.extend(list(repo_issues))
+    # Collect the ids belonging to each Jira repo
+    ids = dict()
+    for jira_name in jira_repos_db.list_collection_names():
+        ids[jira_name] = []
+    for issue_id in request.ids:
+        split_id = issue_id.split('-')
+        # First part is the jira repo name, second part is the id
+        ids[split_id[0]].append(split_id[1])
 
-    # Build and send response
-    response = IssueDataOut()
     data = {}
-    for issue in issues:
-        attributes = {}
-        for attr in request.attributes:
-            if issue['fields'][attr] is not None:
-                attributes[attr] = issue['fields'][attr]
-            elif attr not in list(default_value.keys()):
-                raise AttributeError(f'Attribute {attr} is required for issue {issue["key"]}')
-            else:
-                attributes[attr] = default_value[attr]
-        data[issue['key']] = attributes
+    for jira_name in jira_repos_db.list_collection_names():
+        issues = jira_repos_db[jira_name].find(
+            {'id': {'$in': ids[jira_name]}},
+            ['id'] + [f'fields.{attr}' for attr in request.attributes]
+        )
+
+        for issue in issues:
+            attributes = {}
+            for attr in request.attributes:
+                if issue['fields'][attr] is not None:
+                    # Attribute exists
+                    attributes[attr] = issue['fields'][attr]
+                elif attr not in list(default_value.keys()):
+                    # Attribute does not exist, but is required
+                    raise AttributeError(f'Attribute {attr} is required for issue {issue["key"]}')
+                else:
+                    # Use default value for attribute
+                    attributes[attr] = default_value[attr]
+            data[f'{jira_name}-{issue["id"]}'] = attributes
+    response = IssueDataOut()
     response.data = data
     return response

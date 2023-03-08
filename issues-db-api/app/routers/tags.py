@@ -1,17 +1,21 @@
-from fastapi import APIRouter
-from app.dependencies import manual_labels_collection
+from fastapi import APIRouter, Query
+from app.dependencies import manual_labels_collection, mongo_client
 
 router = APIRouter()
 
 
 @router.get('/tags')
-def tags() -> list[str]:
+def get_tags(filter_projects: bool = Query(default=False, alias='filter-projects')) -> list[str]:
     """
     Returns a list of all tags that are present in the database.
+    Optionally the project tags can be filtered out.
     """
-    tags = set()
-    issues = manual_labels_collection.find({}, ['tags'])
-    for issue in issues:
-        for tag in issue['tags']:
-            tags.add(tag)
-    return tags
+    # Find all tags in the db
+    tags = list(manual_labels_collection.distinct('tags'))
+    if filter_projects:
+        # Filter the project tags
+        projects = mongo_client['IssueLabels']['Projects'].find({})
+        for project in projects:
+            if project['_id'] in tags:
+                tags.remove(project['_id'])
+    return list(tags)

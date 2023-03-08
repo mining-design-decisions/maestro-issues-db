@@ -6,16 +6,16 @@ from app.dependencies import manual_labels_collection
 router = APIRouter()
 example_request = {
     "example": {
-        'keys': [
-            'ISSUE-1',
-            'ISSUE-2'
+        'ids': [
+            'ISSUE-ID-1',
+            'ISSUE-ID-2'
         ]
     }
 }
 
 
 class ManualLabelsIn(BaseModel):
-    keys: list[str]
+    ids: list[str]
 
     class Config:
         schema_extra = example_request
@@ -34,25 +34,25 @@ class ManualLabelsOut(BaseModel):
 @router.get('/manual-labels', response_model=ManualLabelsOut)
 def manual_labels(request: ManualLabelsIn) -> ManualLabelsOut:
     """
-    Returns the manual labels of the issue keys that were
+    Returns the manual labels of the issue ids that were
     provided in the request body.
     TODO: Fix input validation
     """
     issues = manual_labels_collection.find(
         {
             '$and': [
-                {'key': {'$in': request.keys}},
+                {'_id': {'$in': request.ids}},
                 {'tags': 'has-label'},
             ]
         },
-        ['key', 'existence', 'property', 'executive']
+        ['existence', 'property', 'executive']
     )
 
     # Build and send response
     response = ManualLabelsOut()
     labels = {}
     for issue in issues:
-        labels[issue['key']] = {
+        labels[issue['_id']] = {
             'existence': issue['existence'],
             'property': issue['property'],
             'executive': issue['executive']
