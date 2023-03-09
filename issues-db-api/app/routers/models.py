@@ -66,7 +66,8 @@ def put_model(request: PutModelIn) -> PutModelOut:
     """
     _id = mongo_client['Models']['ModelInfo'].insert_one({
         'config': request.config,
-        'versions': []
+        'versions': [],
+        'performances': {}
     }).inserted_id
     return PutModelOut(id=str(_id))
 
@@ -171,3 +172,46 @@ def get_predictions(model_id: str, version_id: str):
         issue_id = issue.pop('_id')
         predictions[issue_id] = issue
     return GetPredictionsOut(predictions=predictions)
+
+
+class PostPerformanceIn(BaseModel):
+    time: str
+    performance: dict
+
+
+@router.post('/models/{model_id}/performances')
+def post_performance(model_id: str, request: PostPerformanceIn):
+    """
+    Add a performance result for the given model.
+    """
+    mongo_client['Models']['ModelInfo'].update_one(
+        {'_id': ObjectId(model_id)},
+        {'$set': {f'performances.{request.time}': request.performance}}
+    )
+
+
+@router.get('/models/{model_id}/performances')
+def get_performances(model_id: str):
+    """
+    Get a list of all performance results for the given model.
+    """
+    model = mongo_client['Models']['ModelInfo'].find_one(
+        {'_id': ObjectId(model_id)},
+        ['performances']
+    )
+    performances = [performance for performance in model['performances']]
+    return {'performances': performances}
+
+
+@router.get('/models/{model_id}/performances/{performance_time}')
+def get_performance(model_id: str, performance_time: str):
+    """
+    Get the requested performance result.
+    """
+    model = mongo_client['Models']['ModelInfo'].find_one(
+        {'_id': ObjectId(model_id)},
+        ['performances']
+    )
+    if model is None:
+        raise Exception(f'Model {model_id} not found')
+    return {performance_time: model['performances'][performance_time]}
