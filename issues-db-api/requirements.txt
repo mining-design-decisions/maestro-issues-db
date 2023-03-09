@@ -2,3 +2,5 @@ fastapi
 uvicorn[standard]
 pymongo
 pydantic
+python-multipart
+python-dateutil
