@@ -90,6 +90,19 @@ def put_model_version(model_id: str, time: str = Form(), file: UploadFile = Form
     }
 
 
+@router.get('/models/{model_id}/versions')
+def get_model_versions(model_id: str):
+    """
+    Get the model versions for the specified model.
+    """
+    model = mongo_client['Models']['ModelInfo'].find_one(
+        {'_id': ObjectId(model_id)},
+        ['versions']
+    )
+    versions = [str(version['id']) for version in model['versions']]
+    return {'versions': versions}
+
+
 @router.get('/models/{model_id}/versions/{version_id}')
 def get_model_version(model_id: str, version_id: str):
     """
