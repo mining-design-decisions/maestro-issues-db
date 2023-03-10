@@ -1,8 +1,12 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from app.dependencies import manual_labels_collection
+from app.routers.authentication import validate_token
 
-router = APIRouter()
+router = APIRouter(
+    prefix='/tags',
+    tags=['tags']
+)
 example_request = {
     "example": {
         'data': {
@@ -26,8 +30,8 @@ class AddTagsIn(BaseModel):
         schema_extra = example_request
 
 
-@router.post('/tags/add-tags')
-def add_tags(request: AddTagsIn):
+@router.post('/add-tags')
+def add_tags(request: AddTagsIn, token=Depends(validate_token)):
     """
     Method for adding tags to issues in bulk. The tags and
     issue ids should be specified in the request body.

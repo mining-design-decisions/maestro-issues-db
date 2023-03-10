@@ -1,11 +1,15 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from app.dependencies import manual_labels_collection
+from app.routers.authentication import validate_token
 
-router = APIRouter()
+router = APIRouter(
+    prefix='/issues',
+    tags=['issues']
+)
 
 
-@router.post('/issues/{issue_id}/mark-review')
-def mark_review(issue_id: str):
+@router.post('/{issue_id}/mark-review')
+def mark_review(issue_id: str, token=Depends(validate_token)):
     tags = manual_labels_collection.find_one(
         {'_id': issue_id},
         ['tags']
@@ -22,8 +26,8 @@ def mark_review(issue_id: str):
     )
 
 
-@router.post('/issues/{issue_id}/mark-training')
-def mark_training(issue_id: str):
+@router.post('/{issue_id}/mark-training')
+def mark_training(issue_id: str, token=Depends(validate_token)):
     tags = manual_labels_collection.find_one(
         {'_id': issue_id},
         ['tags']

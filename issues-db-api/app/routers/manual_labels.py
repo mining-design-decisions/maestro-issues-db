@@ -3,7 +3,10 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 from app.dependencies import manual_labels_collection
 
-router = APIRouter()
+router = APIRouter(
+    prefix='/manual-labels',
+    tags=['manual-labels']
+)
 example_request = {
     "example": {
         'ids': [
@@ -31,12 +34,11 @@ class ManualLabelsOut(BaseModel):
     labels: dict[str, Label] = {}
 
 
-@router.get('/manual-labels', response_model=ManualLabelsOut)
+@router.get('', response_model=ManualLabelsOut)
 def manual_labels(request: ManualLabelsIn) -> ManualLabelsOut:
     """
     Returns the manual labels of the issue ids that were
     provided in the request body.
-    TODO: Fix input validation
     """
     issues = manual_labels_collection.find(
         {

@@ -1,11 +1,15 @@
 import typing
-from fastapi import APIRouter, UploadFile, Response, Form
+from fastapi import APIRouter, UploadFile, Response, Form, Depends
 from pydantic import BaseModel
 from app.dependencies import mongo_client, fs
+from app.routers.authentication import validate_token
 from bson import ObjectId
 from dateutil import parser
 
-router = APIRouter()
+router = APIRouter(
+    prefix='/models',
+    tags=['models']
+)
 example_request = {
     "example": {
         'model': 'MODEL-1',
@@ -59,8 +63,8 @@ class PutModelOut(BaseModel):
     id: str
 
 
-@router.post('/models')
-def put_model(request: PutModelIn) -> PutModelOut:
+@router.post('')
+def put_model(request: PutModelIn, token=Depends(validate_token)) -> PutModelOut:
     """
     Creates a new model entry with the given config.
     """
@@ -72,8 +76,13 @@ def put_model(request: PutModelIn) -> PutModelOut:
     return PutModelOut(id=str(_id))
 
 
-@router.post('/models/{model_id}/versions')
-def put_model_version(model_id: str, time: str = Form(), file: UploadFile = Form()):
+@router.post('/{model_id}/versions')
+def put_model_version(
+        model_id: str,
+        time: str = Form(),
+        file: UploadFile = Form(),
+        token=Depends(validate_token)
+):
     """
     Upload a new version for the given model-id.
     """
@@ -90,7 +99,7 @@ def put_model_version(model_id: str, time: str = Form(), file: UploadFile = Form
     }
 
 
-@router.get('/models/{model_id}/versions')
+@router.get('/{model_id}/versions')
 def get_model_versions(model_id: str):
     """
     Get the model versions for the specified model.
@@ -103,7 +112,7 @@ def get_model_versions(model_id: str):
     return {'versions': versions}
 
 
-@router.get('/models/{model_id}/versions/{version_id}')
+@router.get('/{model_id}/versions/{version_id}')
 def get_model_version(model_id: str, version_id: str):
     """
     Get the requested version for the given model.
@@ -128,7 +137,7 @@ class GetModelOut(BaseModel):
     versions: typing.Any
 
 
-@router.get('/models/{model_id}')
+@router.get('/{model_id}')
 def get_model(model_id: str) -> GetModelOut:
     model = mongo_client['Models']['ModelInfo'].find_one({
         '_id': ObjectId(model_id)
@@ -150,7 +159,7 @@ class GetModelsOut(BaseModel):
     ids: list[str]
 
 
-@router.get('/models')
+@router.get('')
 def get_models():
     models = mongo_client['Models']['ModelInfo'].find(
         {},
@@ -164,8 +173,13 @@ class PostPredictionsIn(BaseModel):
     predictions: dict[str, dict[str, dict[str, typing.Any]]]
 
 
-@router.post('/models/{model_id}/versions/{version_id}/predictions')
-def post_predictions(model_id: str, version_id: str, request: PostPredictionsIn):
+@router.post('/{model_id}/versions/{version_id}/predictions')
+def post_predictions(
+        model_id: str,
+        version_id: str,
+        request: PostPredictionsIn,
+        token=Depends(validate_token)
+):
     for issue_id, predicted_classes in request.predictions.items():
         issue = {'_id': issue_id}
         for predicted_class in predicted_classes:
@@ -177,7 +191,7 @@ class GetPredictionsOut(BaseModel):
     predictions: dict[str, dict[str, dict[str, typing.Any]]]
 
 
-@router.get('/models/{model_id}/versions/{version_id}/predictions')
+@router.get('/{model_id}/versions/{version_id}/predictions')
 def get_predictions(model_id: str, version_id: str):
     issues = mongo_client['PredictedLabels'][f'{model_id}-{version_id}'].find({})
     predictions = dict()
@@ -192,8 +206,12 @@ class PostPerformanceIn(BaseModel):
     performance: dict
 
 
-@router.post('/models/{model_id}/performances')
-def post_performance(model_id: str, request: PostPerformanceIn):
+@router.post('/{model_id}/performances')
+def post_performance(
+        model_id: str,
+        request: PostPerformanceIn,
+        token=Depends(validate_token)
+):
     """
     Add a performance result for the given model.
     """
@@ -203,7 +221,7 @@ def post_performance(model_id: str, request: PostPerformanceIn):
     )
 
 
-@router.get('/models/{model_id}/performances')
+@router.get('/{model_id}/performances')
 def get_performances(model_id: str):
     """
     Get a list of all performance results for the given model.
@@ -216,7 +234,7 @@ def get_performances(model_id: str):
     return {'performances': performances}
 
 
-@router.get('/models/{model_id}/performances/{performance_time}')
+@router.get('/{model_id}/performances/{performance_time}')
 def get_performance(model_id: str, performance_time: str):
     """
     Get the requested performance result.

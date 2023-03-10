@@ -3,7 +3,10 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 from app.dependencies import jira_repos_db
 
-router = APIRouter()
+router = APIRouter(
+    prefix='/issue-data',
+    tags=['issue-data']
+)
 example_request = {
     "example": {
         'ids': [
@@ -44,7 +47,7 @@ class IssueDataOut(BaseModel):
     data: dict[str, dict[str, typing.Any]] = {}
 
 
-@router.get('/issue-data')
+@router.get('')
 def issue_data(request: IssueDataIn) -> IssueDataOut:
     """
     Returns issue data. The returned data is determined by the

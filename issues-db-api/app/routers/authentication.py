@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from jose import JWTError, jwt
 from pymongo.errors import DuplicateKeyError
 from app.dependencies import users_collection
-from app.credentials import SECRET_KEY
+from app.config import SECRET_KEY
 
 
 ALGORITHM = 'HS256'
@@ -18,25 +18,14 @@ class Token(BaseModel):
     token_type: str
 
 
-class TokenData(BaseModel):
-    username: str | None = None
-
-
 class User(BaseModel):
     username: str
-
-
-class UserInDB(User):
-    hashed_password: str
-
-
-class UserNotInDB(User):
     password: str
 
 
 pwd_context = CryptContext(schemes=['bcrypt'], deprecated='auto')
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl='token')
-router = APIRouter()
+router = APIRouter(tags=['authentication'])
 
 
 def verify_password(plain_password, hashed_password):
@@ -47,12 +36,12 @@ def get_password_hash(password):
     return pwd_context.hash(password)
 
 
-def get_user(username: str):
-    user = users_collection.find_one({
-        '_id': username
-    })
-    if user is not None:
-        return UserInDB(username=username, hashed_password=user['hashed_password'])
+def existing_user(username: str) -> bool:
+    user = users_collection.find_one(
+        {'_id': username},
+        ['_id']
+    )
+    return user is not None
 
 
 def authenticate_user(username: str, password: str) -> str | None:
@@ -63,21 +52,19 @@ def authenticate_user(username: str, password: str) -> str | None:
         return None
     if not verify_password(password, user['hashed_password']):
         return None
+    # Return username
     return user['_id']
 
 
-def create_access_token(data: dict, expires_delta: timedelta | None = None):
+def create_access_token(data: dict):
     to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
+    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({'exp': expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
 
-def get_current_user(token: str = Depends(oauth2_scheme)):
+def validate_token(token: str = Depends(oauth2_scheme)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -85,37 +72,29 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
     )
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get('sub')
-        if username is None:
-            raise credentials_exception
-        token_data = TokenData(username=username)
     except JWTError:
         raise credentials_exception
-    user = get_user(username=token_data.username)
-    if user is None:
+    username: str = payload.get('username')
+    if username is None or not existing_user(username):
         raise credentials_exception
-    return user
+    return {'username': username}
 
 
 @router.post('/token', response_model=Token)
 def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = authenticate_user(form_data.username, form_data.password)
-    if not user:
+    username = authenticate_user(form_data.username, form_data.password)
+    if username is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail='Incorrect username or password',
             headers={'WWW-Authenticate': 'Bearer'}
         )
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={'sub': user}, expires_delta=access_token_expires
-    )
+    access_token = create_access_token(data={'username': username})
     return {'access_token': access_token, 'token_type': 'bearer'}
 
 
 @router.post('/create-account')
-def create_account(new_account: UserNotInDB,
-                   token=Depends(get_current_user)):
+def create_account(new_account: User, token=Depends(validate_token)):
     try:
         users_collection.insert_one({
             '_id': new_account.username,

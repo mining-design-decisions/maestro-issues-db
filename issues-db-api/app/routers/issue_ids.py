@@ -2,7 +2,10 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 from app.dependencies import manual_labels_collection
 
-router = APIRouter()
+router = APIRouter(
+    prefix='/issue-ids',
+    tags=['issue-ids']
+)
 example_request = {
     "example": {
         "filter": {
@@ -73,7 +76,7 @@ class IssueIdsOut(BaseModel):
     ids: list[str] = []
 
 
-@router.get('/issue-ids')
+@router.get('')
 def issue_keys(request: IssueIdsIn) -> IssueIdsOut:
     """
     Returns the issue ids for which the issue tags match
