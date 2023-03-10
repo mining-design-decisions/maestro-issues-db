@@ -4,3 +4,5 @@ pymongo
 pydantic
 python-multipart
 python-dateutil
+python-jose[cryptography]
+passlib[bcrypt]

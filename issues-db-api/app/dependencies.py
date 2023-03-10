@@ -6,4 +6,5 @@ import gridfs
 mongo_client = MongoClient(os.environ['MONGO_URL'])
 manual_labels_collection = mongo_client['IssueLabels']['ManualLabels']
 jira_repos_db = mongo_client['JiraRepos']
+users_collection = mongo_client['Users']['Users']
 fs = gridfs.GridFS(mongo_client['ModelsSaveFiles'])
