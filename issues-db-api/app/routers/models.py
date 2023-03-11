@@ -217,7 +217,7 @@ def post_performance(
     """
     mongo_client['Models']['ModelInfo'].update_one(
         {'_id': ObjectId(model_id)},
-        {'$set': {f'performances.{request.time}': request.performance}}
+        {'$set': {f'performances.{request.time.replace(".", "_")}': request.performance}}
     )
 
 
@@ -230,7 +230,7 @@ def get_performances(model_id: str):
         {'_id': ObjectId(model_id)},
         ['performances']
     )
-    performances = [performance for performance in model['performances']]
+    performances = [performance.replace("_", ".") for performance in model['performances']]
     return {'performances': performances}
 
 
@@ -245,4 +245,4 @@ def get_performance(model_id: str, performance_time: str):
     )
     if model is None:
         raise Exception(f'Model {model_id} not found')
-    return {performance_time: model['performances'][performance_time]}
+    return {performance_time.replace("_", "."): model['performances'][performance_time.replace(".", "_")]}
