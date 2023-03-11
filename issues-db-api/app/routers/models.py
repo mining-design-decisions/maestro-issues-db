@@ -203,7 +203,7 @@ def get_predictions(model_id: str, version_id: str):
 
 class PostPerformanceIn(BaseModel):
     time: str
-    performance: dict
+    performance: list
 
 
 @router.post('/{model_id}/performances')
