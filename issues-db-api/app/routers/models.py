@@ -108,7 +108,12 @@ def get_model_versions(model_id: str):
         {'_id': ObjectId(model_id)},
         ['versions']
     )
-    versions = [str(version['id']) for version in model['versions']]
+    versions = []
+    for version in model['versions']:
+        versions.append({
+            'id': str(version['id']),
+            'time': version['time'].isoformat()
+        })
     return {'versions': versions}
 
 
