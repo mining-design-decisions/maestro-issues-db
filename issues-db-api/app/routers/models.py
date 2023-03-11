@@ -189,7 +189,11 @@ def post_predictions(
         issue = {'_id': issue_id}
         for predicted_class in predicted_classes:
             issue[predicted_class] = predicted_classes[predicted_class]
-        mongo_client['PredictedLabels'][f'{model_id}-{version_id}'].insert_one(issue)
+        mongo_client['PredictedLabels'][f'{model_id}-{version_id}'].find_one_and_update(
+            {'_id': issue_id},
+            {'$set': issue},
+            upsert=True
+        )
 
 
 class GetPredictionsOut(BaseModel):
