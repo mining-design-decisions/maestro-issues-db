@@ -55,25 +55,27 @@ class SavePredictionsIn(BaseModel):
         schema_extra = example_request
 
 
-class PutModelIn(BaseModel):
+class PostModelIn(BaseModel):
     config: dict
+    name: typing.Optional[str]
 
 
-class PutModelOut(BaseModel):
+class PostModelOut(BaseModel):
     id: str
 
 
 @router.post('')
-def put_model(request: PutModelIn, token=Depends(validate_token)) -> PutModelOut:
+def put_model(request: PostModelIn, token=Depends(validate_token)) -> PostModelOut:
     """
     Creates a new model entry with the given config.
     """
     _id = mongo_client['Models']['ModelInfo'].insert_one({
+        'name': '' if request.name is None else request.name,
         'config': request.config,
         'versions': [],
         'performances': {}
     }).inserted_id
-    return PutModelOut(id=str(_id))
+    return PostModelOut(id=str(_id))
 
 
 @router.post('/{model_id}/versions')
@@ -138,40 +140,61 @@ def get_model_version(model_id: str, version_id: str):
 
 class GetModelOut(BaseModel):
     id: str
+    name: typing.Optional[str]
     config: dict
-    versions: typing.Any
 
 
 @router.get('/{model_id}')
 def get_model(model_id: str) -> GetModelOut:
-    model = mongo_client['Models']['ModelInfo'].find_one({
-        '_id': ObjectId(model_id)
-    })
-    versions = []
-    for version in model['versions']:
-        versions.append({
-            'id': str(version['id']),
-            'time': version['time'].isoformat()
-        })
+    model = mongo_client['Models']['ModelInfo'].find_one(
+        {'_id': ObjectId(model_id)},
+        ['name', 'config']
+    )
     return GetModelOut(
         id=model_id,
-        config=model['config'],
-        versions=versions
+        name=model['name'],
+        config=model['config']
+    )
+
+
+class UpdateModelIn(BaseModel):
+    name: typing.Optional[str]
+    config: typing.Optional[dict]
+
+
+@router.post('/{model_id}')
+def update_model(model_id: str, request: UpdateModelIn):
+    """
+    Update the name and/or config of the model with model_id.
+    """
+    updated_info = dict()
+    if request.name is not None:
+        updated_info['name'] = request.name
+    if request.config is not None:
+        updated_info['config'] = request.config
+    mongo_client['Models']['ModelInfo'].update_one(
+        {'_id': ObjectId(model_id)},
+        {'$set': updated_info}
     )
 
 
 class GetModelsOut(BaseModel):
-    ids: list[str]
+    models: list[dict[str, typing.Any]]
 
 
 @router.get('')
 def get_models():
     models = mongo_client['Models']['ModelInfo'].find(
         {},
-        ['_id']
+        ['name']
     )
-    model_ids = [str(model['_id']) for model in models]
-    return GetModelsOut(ids=model_ids)
+    response = []
+    for model in models:
+        response.append({
+            'id': str(model['_id']),
+            'name': model['name']
+        })
+    return GetModelsOut(models=response)
 
 
 class PostPredictionsIn(BaseModel):
