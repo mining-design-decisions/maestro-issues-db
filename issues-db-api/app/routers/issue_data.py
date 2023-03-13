@@ -1,5 +1,5 @@
 import typing
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from app.dependencies import jira_repos_db
 
@@ -7,19 +7,6 @@ router = APIRouter(
     prefix='/issue-data',
     tags=['issue-data']
 )
-example_request = {
-    "example": {
-        'ids': [
-            'ISSUE-ID-1',
-            'ISSUE-ID-2'
-        ],
-        'attributes': [
-            'summary',
-            'description'
-        ]
-    }
-}
-
 
 default_value = {
     'summary': '',
@@ -35,12 +22,16 @@ default_value = {
 }
 
 
+def get_attr_required_exception(attribute: str, issue_id: str):
+    return HTTPException(
+        status_code=409,
+        detail=f'Attribute "{attribute}" is required for issue "{issue_id}"'
+    )
+
+
 class IssueDataIn(BaseModel):
     ids: list[str]
     attributes: list[str]
-
-    class Config:
-        schema_extra = example_request
 
 
 class IssueDataOut(BaseModel):
@@ -48,7 +39,7 @@ class IssueDataOut(BaseModel):
 
 
 @router.get('')
-def issue_data(request: IssueDataIn) -> IssueDataOut:
+def get_issue_data(request: IssueDataIn) -> IssueDataOut:
     """
     Returns issue data. The returned data is determined by the
     specified issue ids and the attributes that are requested.
@@ -69,23 +60,41 @@ def issue_data(request: IssueDataIn) -> IssueDataOut:
             ['id'] + [attr if attr == 'key' else f'fields.{attr}' for attr in request.attributes]
         )
 
+        remaining_ids = set(ids[jira_name])
         for issue in issues:
+            if issue['id'] not in remaining_ids:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f'Duplicate issue in the database: {jira_name}-{issue["id"]}'
+                )
+            remaining_ids.remove(issue['id'])
             attributes = {}
             for attr in request.attributes:
                 if attr == 'key':
                     if issue[attr] is None:
-                        raise AttributeError(f'Attribute {attr} is required for issue {jira_name}-{issue["id"]}')
+                        raise get_attr_required_exception(attr, f'{jira_name}-{issue["id"]}')
                     attributes[attr] = issue[attr]
+                elif attr not in issue['fields']:
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f'Attribute "{attr}" is not found for issue: {jira_name}-{issue["id"]}'
+                    )
                 elif issue['fields'][attr] is not None:
                     # Attribute exists
                     attributes[attr] = issue['fields'][attr]
                 elif attr not in list(default_value.keys()):
                     # Attribute does not exist, but is required
-                    raise AttributeError(f'Attribute {attr} is required for issue {jira_name}-{issue["id"]}')
+                    raise get_attr_required_exception(attr, f'{jira_name}-{issue["id"]}')
                 else:
                     # Use default value for attribute
                     attributes[attr] = default_value[attr]
             data[f'{jira_name}-{issue["id"]}'] = attributes
+        if remaining_ids:
+            raise HTTPException(
+                status_code=404,
+                detail=f'The following issue(s) could not be found: '
+                       f'{[f"{jira_name}-{id_}" for id_ in remaining_ids]}'
+            )
     response = IssueDataOut()
     response.data = data
     return response

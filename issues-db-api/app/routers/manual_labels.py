@@ -1,5 +1,5 @@
 import typing
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from app.dependencies import manual_labels_collection
 
@@ -7,21 +7,10 @@ router = APIRouter(
     prefix='/manual-labels',
     tags=['manual-labels']
 )
-example_request = {
-    "example": {
-        'ids': [
-            'ISSUE-ID-1',
-            'ISSUE-ID-2'
-        ]
-    }
-}
 
 
 class ManualLabelsIn(BaseModel):
     ids: list[str]
-
-    class Config:
-        schema_extra = example_request
 
 
 class Label(typing.TypedDict):
@@ -51,13 +40,18 @@ def manual_labels(request: ManualLabelsIn) -> ManualLabelsOut:
     )
 
     # Build and send response
-    response = ManualLabelsOut()
     labels = {}
+    ids = set(request.ids)
     for issue in issues:
+        ids.remove(issue['_id'])
         labels[issue['_id']] = {
             'existence': issue['existence'],
             'property': issue['property'],
             'executive': issue['executive']
         }
-    response.labels = labels
-    return response
+    if ids:
+        raise HTTPException(
+            status_code=404,
+            detail=f'The following issues do not have a manual label: {list(ids)}'
+        )
+    return ManualLabelsOut(labels=labels)

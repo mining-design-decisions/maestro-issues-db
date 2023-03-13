@@ -1,7 +1,7 @@
 import typing
-from fastapi import APIRouter, UploadFile, Response, Form, Depends
+from fastapi import APIRouter, UploadFile, Response, Form, Depends, HTTPException
 from pydantic import BaseModel
-from app.dependencies import mongo_client, fs
+from app.dependencies import mongo_client, fs, model_info_collection
 from app.routers.authentication import validate_token
 from bson import ObjectId
 from dateutil import parser
@@ -64,12 +64,37 @@ class PostModelOut(BaseModel):
     id: str
 
 
+def _get_model(model_id: str, attributes: list[str]):
+    model = model_info_collection.find_one(
+        {'_id': ObjectId(model_id)},
+        attributes
+    )
+    if model is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f'Model "{model_id}" was not found'
+        )
+    return model
+
+
+def _update_model(model_id: str, update: dict):
+    result = model_info_collection.update_one(
+        {'_id': ObjectId(model_id)},
+        update
+    )
+    if result.matched_count == 0:
+        raise HTTPException(
+            status_code=404,
+            detail=f'Model "{model_id}" was not found'
+        )
+
+
 @router.post('')
-def put_model(request: PostModelIn, token=Depends(validate_token)) -> PostModelOut:
+def create_model(request: PostModelIn, token=Depends(validate_token)) -> PostModelOut:
     """
     Creates a new model entry with the given config.
     """
-    _id = mongo_client['Models']['ModelInfo'].insert_one({
+    _id = model_info_collection.insert_one({
         'name': '' if request.name is None else request.name,
         'config': request.config,
         'versions': [],
@@ -79,7 +104,7 @@ def put_model(request: PostModelIn, token=Depends(validate_token)) -> PostModelO
 
 
 @router.post('/{model_id}/versions')
-def put_model_version(
+def create_model_version(
         model_id: str,
         time: str = Form(),
         file: UploadFile = Form(),
@@ -89,13 +114,12 @@ def put_model_version(
     Upload a new version for the given model-id.
     """
     version_id = fs.put(file.file, filename=file.filename)
-    mongo_client['Models']['ModelInfo'].update_one(
-        {'_id': ObjectId(model_id)},
-        {'$push': {'versions': {
+    _update_model(model_id, {'$push': {
+        'versions': {
             'id': version_id,
             'time': parser.parse(time)
-        }}}
-    )
+        }
+    }})
     return {
         'version-id': str(version_id)
     }
@@ -106,10 +130,7 @@ def get_model_versions(model_id: str):
     """
     Get the model versions for the specified model.
     """
-    model = mongo_client['Models']['ModelInfo'].find_one(
-        {'_id': ObjectId(model_id)},
-        ['versions']
-    )
+    model = _get_model(model_id, ['versions'])
     versions = []
     for version in model['versions']:
         versions.append({
@@ -124,18 +145,16 @@ def get_model_version(model_id: str, version_id: str):
     """
     Get the requested version for the given model.
     """
-    model = mongo_client['Models']['ModelInfo'].find_one(
-        {'_id': ObjectId(model_id)},
-        ['versions']
-    )
-    if model is None:
-        raise Exception(f'Model {model_id} not found')
+    model = _get_model(model_id, ['versions'])
     for version in model['versions']:
         if version_id == str(version['id']):
             mongo_file = fs.get(version['id'])
             return Response(mongo_file.read(),
                             media_type='application/octet-stream')
-    raise Exception(f'Version {version_id} not found for model {model_id}')
+    raise HTTPException(
+        status_code=404,
+        detail=f'Version "{version_id}" was not found for model "{model_id}"'
+    )
 
 
 class GetModelOut(BaseModel):
@@ -146,10 +165,10 @@ class GetModelOut(BaseModel):
 
 @router.get('/{model_id}')
 def get_model(model_id: str) -> GetModelOut:
-    model = mongo_client['Models']['ModelInfo'].find_one(
-        {'_id': ObjectId(model_id)},
-        ['name', 'config']
-    )
+    """
+    Return the model with the specified model id.
+    """
+    model = _get_model(model_id, ['name', 'config'])
     return GetModelOut(
         id=model_id,
         name=model['name'],
@@ -172,10 +191,7 @@ def update_model(model_id: str, request: UpdateModelIn):
         updated_info['name'] = request.name
     if request.config is not None:
         updated_info['config'] = request.config
-    mongo_client['Models']['ModelInfo'].update_one(
-        {'_id': ObjectId(model_id)},
-        {'$set': updated_info}
-    )
+    _update_model(model_id, {'$set': updated_info})
 
 
 class GetModelsOut(BaseModel):
@@ -184,10 +200,10 @@ class GetModelsOut(BaseModel):
 
 @router.get('')
 def get_models():
-    models = mongo_client['Models']['ModelInfo'].find(
-        {},
-        ['name']
-    )
+    """
+    Returns a list of all models in the database.
+    """
+    models = model_info_collection.find({}, ['name'])
     response = []
     for model in models:
         response.append({
@@ -208,6 +224,17 @@ def post_predictions(
         request: PostPredictionsIn,
         token=Depends(validate_token)
 ):
+    """
+    Saves the predictions of the specified model version in the database.
+    """
+    # Make sure the version of the model exists
+    model = _get_model(model_id, ['versions'])
+    versions = [str(version['id']) for version in model['versions']]
+    if version_id not in versions:
+        raise HTTPException(
+            status_code=404,
+            detail=f'Version "{version_id}" was not found for model "{model_id}"'
+        )
     for issue_id, predicted_classes in request.predictions.items():
         issue = {'_id': issue_id}
         for predicted_class in predicted_classes:
@@ -225,6 +252,14 @@ class GetPredictionsOut(BaseModel):
 
 @router.get('/{model_id}/versions/{version_id}/predictions')
 def get_predictions(model_id: str, version_id: str):
+    """
+    Returns the predicted labels of the specified model version.
+    """
+    if f'{model_id}-{version_id}' not in mongo_client['PredictedLabels'].list_collection_names():
+        raise HTTPException(
+            status_code=404,
+            detail=f'No predictions found for model "{model_id}" version "{version_id}"'
+        )
     issues = mongo_client['PredictedLabels'][f'{model_id}-{version_id}'].find({})
     predictions = dict()
     for issue in issues:
@@ -247,10 +282,9 @@ def post_performance(
     """
     Add a performance result for the given model.
     """
-    mongo_client['Models']['ModelInfo'].update_one(
-        {'_id': ObjectId(model_id)},
-        {'$set': {f'performances.{request.time.replace(".", "_")}': request.performance}}
-    )
+    _update_model(model_id, {'$set': {
+        f'performances.{request.time.replace(".", "_")}': request.performance
+    }})
 
 
 @router.get('/{model_id}/performances')
@@ -258,10 +292,7 @@ def get_performances(model_id: str):
     """
     Get a list of all performance results for the given model.
     """
-    model = mongo_client['Models']['ModelInfo'].find_one(
-        {'_id': ObjectId(model_id)},
-        ['performances']
-    )
+    model = _get_model(model_id, ['performances'])
     performances = [performance.replace("_", ".") for performance in model['performances']]
     return {'performances': performances}
 
@@ -271,10 +302,5 @@ def get_performance(model_id: str, performance_time: str):
     """
     Get the requested performance result.
     """
-    model = mongo_client['Models']['ModelInfo'].find_one(
-        {'_id': ObjectId(model_id)},
-        ['performances']
-    )
-    if model is None:
-        raise Exception(f'Model {model_id} not found')
+    model = _get_model(model_id, ['performances'])
     return {performance_time.replace("_", "."): model['performances'][performance_time.replace(".", "_")]}

@@ -28,6 +28,13 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl='token')
 router = APIRouter(tags=['authentication'])
 
 
+CREDENTIALS_EXCEPTION = HTTPException(
+    status_code=status.HTTP_401_UNAUTHORIZED,
+    detail='Incorrect username or password',
+    headers={'WWW-Authenticate': 'Bearer'}
+)
+
+
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
@@ -65,18 +72,13 @@ def create_access_token(data: dict):
 
 
 def validate_token(token: str = Depends(oauth2_scheme)):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={'WWW-Authenticate': 'Bearer'}
-    )
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
     except JWTError:
-        raise credentials_exception
+        raise CREDENTIALS_EXCEPTION
     username: str = payload.get('username')
     if username is None or not existing_user(username):
-        raise credentials_exception
+        raise CREDENTIALS_EXCEPTION
     return {'username': username}
 
 
@@ -84,11 +86,7 @@ def validate_token(token: str = Depends(oauth2_scheme)):
 def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
     username = authenticate_user(form_data.username, form_data.password)
     if username is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail='Incorrect username or password',
-            headers={'WWW-Authenticate': 'Bearer'}
-        )
+        raise CREDENTIALS_EXCEPTION
     access_token = create_access_token(data={'username': username})
     return {'access_token': access_token, 'token_type': 'bearer'}
 
