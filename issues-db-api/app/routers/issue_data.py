@@ -1,7 +1,7 @@
 import typing
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from app.dependencies import jira_repos_db
+from app.dependencies import jira_repos_db, issue_links_collection
 
 router = APIRouter(
     prefix='/issue-data',
@@ -55,9 +55,10 @@ def get_issue_data(request: IssueDataIn) -> IssueDataOut:
 
     data = {}
     for jira_name in jira_repos_db.list_collection_names():
+        issue_link_prefix = issue_links_collection.find_one({'_id': jira_name})['link']
         issues = jira_repos_db[jira_name].find(
             {'id': {'$in': ids[jira_name]}},
-            ['id'] + [attr if attr == 'key' else f'fields.{attr}' for attr in request.attributes]
+            ['id', 'key'] + [f'fields.{attr}' for attr in request.attributes if attr not in ['key', 'link']]
         )
 
         remaining_ids = set(ids[jira_name])
@@ -74,6 +75,8 @@ def get_issue_data(request: IssueDataIn) -> IssueDataOut:
                     if issue[attr] is None:
                         raise get_attr_required_exception(attr, f'{jira_name}-{issue["id"]}')
                     attributes[attr] = issue[attr]
+                elif attr == 'link':
+                    attributes[attr] = f'{issue_link_prefix}/browse/{issue["key"]}'
                 elif attr not in issue['fields']:
                     raise HTTPException(
                         status_code=404,

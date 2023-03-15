@@ -9,5 +9,6 @@ jira_repos_db = mongo_client['JiraRepos']
 fs = gridfs.GridFS(mongo_client['ModelsSaveFiles'])
 
 manual_labels_collection = mongo_client['IssueLabels']['ManualLabels']
+issue_links_collection = mongo_client['IssueLabels']['IssueLinks']
 model_info_collection = mongo_client['Models']['ModelInfo']
 users_collection = mongo_client['Users']['Users']
