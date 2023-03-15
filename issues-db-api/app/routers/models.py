@@ -246,12 +246,16 @@ def post_predictions(
         )
 
 
+class GetPredictionsIn(BaseModel):
+    ids: list[str] | None
+
+
 class GetPredictionsOut(BaseModel):
     predictions: dict[str, dict[str, dict[str, typing.Any]]]
 
 
 @router.get('/{model_id}/versions/{version_id}/predictions')
-def get_predictions(model_id: str, version_id: str):
+def get_predictions(model_id: str, version_id: str, request: GetPredictionsIn):
     """
     Returns the predicted labels of the specified model version.
     """
@@ -260,11 +264,22 @@ def get_predictions(model_id: str, version_id: str):
             status_code=404,
             detail=f'No predictions found for model "{model_id}" version "{version_id}"'
         )
-    issues = mongo_client['PredictedLabels'][f'{model_id}-{version_id}'].find({})
+    if request.ids is None:
+        filter_ = {}
+    else:
+        filter_ = {'_id': {'$in': request.ids}}
+    issues = mongo_client['PredictedLabels'][f'{model_id}-{version_id}'].find(filter_)
     predictions = dict()
+    remaining_ids = set(request.ids)
     for issue in issues:
         issue_id = issue.pop('_id')
         predictions[issue_id] = issue
+        remaining_ids.remove(issue_id)
+    if remaining_ids:
+        raise HTTPException(
+            status_code=404,
+            detail=f'The following issue(s) could not be found: {remaining_ids}'
+        )
     return GetPredictionsOut(predictions=predictions)
 
 
