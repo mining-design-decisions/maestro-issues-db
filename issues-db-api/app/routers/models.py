@@ -275,11 +275,8 @@ def get_predictions(model_id: str, version_id: str, request: GetPredictionsIn):
         issue_id = issue.pop('_id')
         predictions[issue_id] = issue
         remaining_ids.remove(issue_id)
-    if remaining_ids:
-        raise HTTPException(
-            status_code=404,
-            detail=f'The following issue(s) could not be found: {remaining_ids}'
-        )
+    for issue_id in remaining_ids:
+        predictions[issue_id] = None
     return GetPredictionsOut(predictions=predictions)
 
 
