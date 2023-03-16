@@ -25,6 +25,6 @@ def mark_review(issue_id: str, token=Depends(validate_token)):
     _update_manual_label(issue_id, {'$addToSet': {'tags': 'needs-review'}})
 
 
-@router.post('/{issue_id}/mark-training')
+@router.post('/{issue_id}/finish-review')
 def mark_training(issue_id: str, token=Depends(validate_token)):
     _update_manual_label(issue_id, {'$pull': {'tags': 'needs-review'}})
