@@ -30,7 +30,10 @@ def update_manual_label(issue_id: str, request: Label):
     """
     result = manual_labels_collection.update_one(
         {'_id': issue_id},
-        {'$set': request}
+        {
+            '$set': request,
+            '$addToSet': {'tags': 'has-label'}
+        }
     )
     if result.matched_count == 0:
         raise HTTPException(

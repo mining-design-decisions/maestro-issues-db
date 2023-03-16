@@ -22,11 +22,9 @@ def _update_manual_label(issue_id: str, update: dict):
 
 @router.post('/{issue_id}/mark-review')
 def mark_review(issue_id: str, token=Depends(validate_token)):
-    _update_manual_label(issue_id, {'$pull': {'tags': 'has-label'}})
     _update_manual_label(issue_id, {'$addToSet': {'tags': 'needs-review'}})
 
 
 @router.post('/{issue_id}/mark-training')
 def mark_training(issue_id: str, token=Depends(validate_token)):
     _update_manual_label(issue_id, {'$pull': {'tags': 'needs-review'}})
-    _update_manual_label(issue_id, {'$addToSet': {'tags': 'has-label'}})
