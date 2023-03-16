@@ -23,6 +23,22 @@ class ManualLabelsOut(BaseModel):
     labels: dict[str, Label] = {}
 
 
+@router.post('/{issue_id}')
+def update_manual_label(issue_id: str, request: Label):
+    """
+    Update the manual label of the given issue.
+    """
+    result = manual_labels_collection.update_one(
+        {'_id': issue_id},
+        {'$set': request}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(
+            status_code=404,
+            detail=f'Issue "{issue_id}" was not found'
+        )
+
+
 @router.get('', response_model=ManualLabelsOut)
 def manual_labels(request: ManualLabelsIn) -> ManualLabelsOut:
     """
