@@ -133,3 +133,5 @@ data/
 .idea
 server.crt
 server.key
+fullchain.pem
+privkey.pem

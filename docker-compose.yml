@@ -24,7 +24,7 @@ services:
     build: ./issues-db-api/
     image: issues-db-api
     ports:
-      - 8000:8000
+      - 433:433
     networks:
       - issues-db
     environment:
