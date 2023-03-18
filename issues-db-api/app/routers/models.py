@@ -148,8 +148,13 @@ def get_model_version(model_id: str, version_id: str):
     model = _get_model(model_id, ['versions'])
     for version in model['versions']:
         if version_id == str(version['id']):
+            def read_file_in_chunks(file):
+                chunk = file.read(1024)
+                if not chunk:
+                    return
+                yield chunk
             mongo_file = fs.get(version['id'])
-            return Response(mongo_file.read(),
+            return Response(read_file_in_chunks(mongo_file),
                             media_type='application/octet-stream')
     raise HTTPException(
         status_code=404,
