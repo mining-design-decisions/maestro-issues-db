@@ -1,5 +1,6 @@
 import typing
 from fastapi import APIRouter, UploadFile, Response, Form, Depends, HTTPException
+from fastapi.response import StreamResponse
 from pydantic import BaseModel
 from app.dependencies import mongo_client, fs, model_info_collection
 from app.routers.authentication import validate_token
@@ -154,8 +155,8 @@ def get_model_version(model_id: str, version_id: str):
                     return
                 yield chunk
             mongo_file = fs.get(version['id'])
-            return Response(read_file_in_chunks(mongo_file),
-                            media_type='application/octet-stream')
+            return StreamResponse(read_file_in_chunks(mongo_file),
+                                  media_type='application/octet-stream')
     raise HTTPException(
         status_code=404,
         detail=f'Version "{version_id}" was not found for model "{model_id}"'
