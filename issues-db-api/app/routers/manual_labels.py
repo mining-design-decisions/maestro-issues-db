@@ -1,7 +1,8 @@
 import typing
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from app.dependencies import manual_labels_collection
+from app.routers.authentication import validate_token
 
 router = APIRouter(
     prefix='/manual-labels',
@@ -24,7 +25,7 @@ class ManualLabelsOut(BaseModel):
 
 
 @router.post('/{issue_id}')
-def update_manual_label(issue_id: str, request: Label):
+def update_manual_label(issue_id: str, request: Label, token=Depends(validate_token)):
     """
     Update the manual label of the given issue.
     """

@@ -189,7 +189,7 @@ class UpdateModelIn(BaseModel):
 
 
 @router.post('/{model_id}')
-def update_model(model_id: str, request: UpdateModelIn):
+def update_model(model_id: str, request: UpdateModelIn, token=Depends(validate_token)):
     """
     Update the name and/or config of the model with model_id.
     """
