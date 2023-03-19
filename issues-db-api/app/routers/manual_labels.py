@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from app.dependencies import manual_labels_collection
 from app.routers.authentication import validate_token
-from app.router.issues import _update_manual_label
+from app.routers.issues import _update_manual_label
 
 router = APIRouter(
     prefix='/manual-labels',
@@ -38,7 +38,7 @@ def update_manual_label(issue_id: str, request: Label, token=Depends(validate_to
         {'_id': issue_id},
         {
             '$set': request,
-            '$addToSet': {'tags': 'has-label'}
+            '$addToSet': {'tags': {'$each': ['has-label', token['username']]}}
         }
     )
     if result.matched_count == 0:
@@ -89,6 +89,7 @@ def add_comment(issue_id: str, comment: Comment, token=Depends(validate_token)):
     """
     _update_manual_label(issue_id, {
         '$push': {'comments': {
-            token.username: comment
-        }}
+            token['username']: comment.comment
+        }},
+        '$addToSet': {'tags': token['username']}
     })
