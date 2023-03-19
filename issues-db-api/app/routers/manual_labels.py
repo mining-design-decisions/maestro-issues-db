@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from app.dependencies import manual_labels_collection
 from app.routers.authentication import validate_token
+from app.router.issues import _update_manual_label
 
 router = APIRouter(
     prefix='/manual-labels',
@@ -22,6 +23,10 @@ class Label(typing.TypedDict):
 
 class ManualLabelsOut(BaseModel):
     labels: dict[str, Label] = {}
+
+
+class Comment(BaseModel):
+    comment: str
 
 
 @router.post('/{issue_id}')
@@ -75,3 +80,15 @@ def manual_labels(request: ManualLabelsIn) -> ManualLabelsOut:
             detail=f'The following issues do not have a manual label: {list(ids)}'
         )
     return ManualLabelsOut(labels=labels)
+
+
+@router.post('/{issue_id}/comments')
+def add_comment(issue_id: str, comment: Comment, token=Depends(validate_token)):
+    """
+    Adds a comment to the manual label of the given issue.
+    """
+    _update_manual_label(issue_id, {
+        '$push': {'comments': {
+            token.username: comment
+        }}
+    })
