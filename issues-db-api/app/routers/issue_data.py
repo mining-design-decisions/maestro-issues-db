@@ -18,7 +18,9 @@ default_value = {
     'parent': False,
     'issuelinks': [],
     'attachments': [],
-    'sub-tasks': []
+    'sub-tasks': [],
+    'resolution': None,
+    'assignee': None
 }
 
 
