@@ -33,6 +33,13 @@ services:
     depends_on:
       - mongo-express
 
+  backup-issues-db:
+    container_name: backup-issues-db
+    build: ./backup/
+    image: backup-issues-db
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
 networks:
   issues-db:
     driver: bridge
