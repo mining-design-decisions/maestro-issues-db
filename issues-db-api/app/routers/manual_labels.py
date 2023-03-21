@@ -29,6 +29,10 @@ class Comment(BaseModel):
     comment: str
 
 
+class Comments(BaseModel):
+    comments: list[dict[str, str]]
+
+
 @router.post('/{issue_id}')
 def update_manual_label(issue_id: str, request: Label, token=Depends(validate_token)):
     """
@@ -93,3 +97,22 @@ def add_comment(issue_id: str, comment: Comment, token=Depends(validate_token)):
         }},
         '$addToSet': {'tags': token['username']}
     })
+
+
+@router.get('/{issue_id}/comments', response_model=Comments)
+def get_comments(issue_id: str):
+    """
+    Gets the comments for the specified issue.
+    """
+    issue = manual_labels_collection.find_one(
+        {'_id': issue_id},
+        ['comments']
+    )
+    if issue is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f'Issue "{issue_id}" was not found'
+        )
+    if issue['comments'] is None:
+        return Comments(comments=[])
+    return Comments(comments=issue['comments'])
