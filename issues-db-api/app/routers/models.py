@@ -2,7 +2,7 @@ import typing
 from fastapi import APIRouter, UploadFile, Response, Form, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from app.dependencies import mongo_client, fs, model_info_collection
+from app.dependencies import mongo_client, fs, model_info_collection, issue_labels_db
 from app.routers.authentication import validate_token
 from bson import ObjectId
 from dateutil import parser
@@ -241,7 +241,7 @@ def post_predictions(
         issue = {'_id': issue_id}
         for predicted_class in predicted_classes:
             issue[predicted_class] = predicted_classes[predicted_class]
-        mongo_client['PredictedLabels'][f'{model_id}-{version_id}'].find_one_and_update(
+        issue_labels_db[f'{model_id}-{version_id}'].find_one_and_update(
             {'_id': issue_id},
             {'$set': issue},
             upsert=True
@@ -261,7 +261,7 @@ def get_predictions(model_id: str, version_id: str, request: GetPredictionsIn):
     """
     Returns the predicted labels of the specified model version.
     """
-    if f'{model_id}-{version_id}' not in mongo_client['PredictedLabels'].list_collection_names():
+    if f'{model_id}-{version_id}' not in issue_labels_db.list_collection_names():
         raise HTTPException(
             status_code=404,
             detail=f'No predictions found for model "{model_id}" version "{version_id}"'
@@ -270,7 +270,7 @@ def get_predictions(model_id: str, version_id: str, request: GetPredictionsIn):
         filter_ = {}
     else:
         filter_ = {'_id': {'$in': request.ids}}
-    issues = mongo_client['PredictedLabels'][f'{model_id}-{version_id}'].find(filter_)
+    issues = issue_labels_db[f'{model_id}-{version_id}'].find(filter_)
     predictions = dict()
     remaining_ids = set(request.ids)
     for issue in issues:

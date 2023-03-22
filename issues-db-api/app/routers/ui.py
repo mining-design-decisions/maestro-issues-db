@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
-from app.dependencies import manual_labels_collection, jira_repos_db, predictions_db
+from app.dependencies import manual_labels_collection, jira_repos_db, issue_labels_db
 
 router = APIRouter(
     prefix='/ui',
@@ -33,11 +33,20 @@ def get_ui_data(request: Query):
     limit = request.limit
 
     if request.sort is not None:
-        filtered_issues = manual_labels_collection.find(request.filter, ['_id'])
-        # filtered_issues = [issue['_id'] for issue in filtered_issues]
-        issues = predictions_db[f'{request.sort["model-id"]}-{request.sort["version-id"]}'].find(
-            {'_id': {'$in': filtered_issues}}
-        ).sort(f'{request.sort["class"]}.probability', -1).skip(page * limit).limit(limit)
+        issues = manual_labels_collection.aggregate([
+            {'$match': request.filter},
+            {'$lookup': {
+                'from': f'{request.sort["model-id"]}-{request.sort["version-id"]}',
+                'localField': '_id',
+                'foreignField': '_id',
+                'as': 'predicted_label'
+            }},
+            {'$sort': {
+                f'predicted_label.0.{request.sort["class"]}.probability': -1
+            }},
+            {'$skip': page * limit},
+            {'$limit': limit}
+        ])
     else:
         issues = manual_labels_collection.find(request.filter, ['_id']).skip(page * limit).limit(limit)
 
@@ -50,7 +59,7 @@ def get_ui_data(request: Query):
         manual_label = manual_labels_collection.find_one({'_id': issue['_id']})
         predictions = []
         for model in request.models:
-            prediction = predictions_db[f'{model["model-id"]}-{model["version-id"]}'].find_one({
+            prediction = issue_labels_db[f'{model["model-id"]}-{model["version-id"]}'].find_one({
                 '_id': issue['_id']
             })
             if prediction is not None:

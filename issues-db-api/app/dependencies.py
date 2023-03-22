@@ -6,7 +6,7 @@ import gridfs
 mongo_client = MongoClient(os.environ['MONGO_URL'])
 
 jira_repos_db = mongo_client['JiraRepos']
-predictions_db = mongo_client['PredictedLabels']
+issue_labels_db = mongo_client['IssueLabels']
 fs = gridfs.GridFS(mongo_client['ModelsSaveFiles'])
 embeddings_fs = gridfs.GridFS(mongo_client['EmbeddingsFS'])
 
