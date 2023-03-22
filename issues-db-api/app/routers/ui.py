@@ -33,11 +33,11 @@ def get_ui_data(request: Query):
     limit = request.limit
 
     if request.sort is not None:
-        issues = manual_labels_collection.find(request.filter, ['_id'])\
-            .sort(f'predictions.{request.sort["model-id"]}-{request.sort["version-id"]}', -1)\
+        issues = manual_labels_collection.find(request.filter)\
+            .sort(f'predictions.{request.sort["model-id"]}-{request.sort["version-id"]}.{request.sort["class"]}', -1)\
             .skip(page * limit).limit(limit)
     else:
-        issues = manual_labels_collection.find(request.filter, ['_id']).skip(page * limit).limit(limit)
+        issues = manual_labels_collection.find(request.filter).skip(page * limit).limit(limit)
 
     response = []
     for issue in issues:
@@ -45,7 +45,6 @@ def get_ui_data(request: Query):
             {'id': issue['_id'].split('-')[1]},
             ['key', 'fields.summary', 'fields.description']
         )
-        manual_label = manual_labels_collection.find_one({'_id': issue['_id']})
         predictions = []
         for model in request.models:
             if 'predictions' in issue and f'{model["model-id"]}-{model["version-id"]}' in issue['predictions']:
@@ -60,9 +59,9 @@ def get_ui_data(request: Query):
             'summary': issue_data['fields']['summary'],
             'description': issue_data['fields']['description'],
             'manual-label': {
-                'existence': manual_label['existence'],
-                'property': manual_label['property'],
-                'executive': manual_label['executive']
+                'existence': issue['existence'],
+                'property': issue['property'],
+                'executive': issue['executive']
             },
             'predictions': predictions
         })
