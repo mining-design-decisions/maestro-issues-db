@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
-from app.dependencies import manual_labels_collection, jira_repos_db
+from app.dependencies import manual_labels_collection, jira_repos_db, issue_links_collection
 
 router = APIRouter(
     prefix='/ui',
@@ -45,6 +45,7 @@ def get_ui_data(request: Query):
             {'id': issue['_id'].split('-')[1]},
             ['key', 'fields.summary', 'fields.description']
         )
+        issue_link_prefix = issue_links_collection.find_one({'_id': issue['_id'].split('-')[0]})['link']
         predictions = []
         for model in request.models:
             if 'predictions' in issue and f'{model["model-id"]}-{model["version-id"]}' in issue['predictions']:
@@ -55,6 +56,7 @@ def get_ui_data(request: Query):
                 })
         response.append({
             'id': issue['_id'],
+            'link': f'{issue_link_prefix}/browse/{issue["key"]}',
             'key': issue_data['key'],
             'summary': issue_data['fields']['summary'],
             'description': issue_data['fields']['description'],
