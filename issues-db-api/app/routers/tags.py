@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from app.dependencies import manual_labels_collection
+from app.dependencies import manual_labels_collection, projects_collection
 from app.routers.authentication import validate_token
 
 router = APIRouter(
@@ -11,6 +11,18 @@ router = APIRouter(
 
 class AddTagsIn(BaseModel):
     data: dict[str, list[str]]
+
+
+@router.get('')
+def get_tags():
+    """
+    Retrieve all unique tags in the database.
+    """
+    tags = set(manual_labels_collection.distinct('tags'))
+    projects = projects_collection.find({})
+    projects = set([project['_id'] for project in projects])
+    return {'manual-tags': list(tags - projects),
+            'projects': list(projects)}
 
 
 @router.post('/add-tags')
