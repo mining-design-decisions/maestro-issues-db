@@ -253,7 +253,7 @@ class GetPredictionsIn(BaseModel):
 
 
 class GetPredictionsOut(BaseModel):
-    predictions: dict[str, dict[str, dict[str, typing.Any]]]
+    predictions: dict[str, dict[str, dict[str, typing.Any]] | None]
 
 
 @router.get('/{model_id}/versions/{version_id}/predictions')
