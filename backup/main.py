@@ -61,7 +61,7 @@ def make_backup():
 
 
 def main():
-    schedule.every().day.at('4:00').do(make_backup)
+    schedule.every().day.at('04:00').do(make_backup)
     while True:
         schedule.run_pending()
         time.sleep(60)
