@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from app.routers import tags, issue_data, issue_ids, manual_labels,\
-    models, issues, authentication, embeddings
+    models, issues, authentication, embeddings, ui
 from app.config import SSL_KEYFILE, SSL_CERTFILE
 import uvicorn
 
@@ -14,6 +14,7 @@ app.include_router(manual_labels.router)
 app.include_router(models.router)
 app.include_router(issues.router)
 app.include_router(authentication.router)
+app.include_router(ui.router)
 
 if __name__ == '__main__':
     uvicorn.run(
