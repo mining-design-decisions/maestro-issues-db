@@ -2,7 +2,7 @@ import typing
 from fastapi import APIRouter, UploadFile, Response, Form, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from app.dependencies import mongo_client, fs, model_info_collection, issue_labels_db
+from app.dependencies import fs, model_info_collection, manual_labels_collection
 from app.routers.authentication import validate_token
 from bson import ObjectId
 from dateutil import parser
@@ -238,13 +238,14 @@ def post_predictions(
             detail=f'Version "{version_id}" was not found for model "{model_id}"'
         )
     for issue_id, predicted_classes in request.predictions.items():
-        issue = {'_id': issue_id}
+        predictions = {}
         for predicted_class in predicted_classes:
-            issue[predicted_class] = predicted_classes[predicted_class]
-        issue_labels_db[f'{model_id}-{version_id}'].find_one_and_update(
+            predictions[predicted_class] = predicted_classes[predicted_class]
+        manual_labels_collection.find_one_and_update(
             {'_id': issue_id},
-            {'$set': issue},
-            upsert=True
+            {'$set': {
+                'predictions': {f'{model_id}-{version_id}': predictions}
+            }}
         )
 
 
@@ -261,21 +262,19 @@ def get_predictions(model_id: str, version_id: str, request: GetPredictionsIn):
     """
     Returns the predicted labels of the specified model version.
     """
-    if f'{model_id}-{version_id}' not in issue_labels_db.list_collection_names():
-        raise HTTPException(
-            status_code=404,
-            detail=f'No predictions found for model "{model_id}" version "{version_id}"'
-        )
     if request.ids is None:
-        filter_ = {}
+        filter_ = {f'predictions.{model_id}-{version_id}': {'$exists': True}}
     else:
-        filter_ = {'_id': {'$in': request.ids}}
-    issues = issue_labels_db[f'{model_id}-{version_id}'].find(filter_)
+        filter_ = {'$and': [
+            {'_id': {'$in': request.ids}},
+            {f'predictions.{model_id}-{version_id}': {'$exists': True}}
+        ]}
+    issues = manual_labels_collection.find(filter_, [f'predictions.{model_id}-{version_id}'])
     predictions = dict()
     remaining_ids = set(request.ids)
     for issue in issues:
         issue_id = issue.pop('_id')
-        predictions[issue_id] = issue
+        predictions[issue_id] = issue['predictions'][f'{model_id}-{version_id}']
         remaining_ids.remove(issue_id)
     for issue_id in remaining_ids:
         predictions[issue_id] = None
