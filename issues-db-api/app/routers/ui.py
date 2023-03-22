@@ -34,10 +34,10 @@ def get_ui_data(request: Query):
 
     if request.sort is not None:
         filtered_issues = manual_labels_collection.find(request.filter, ['_id'])
-        filtered_issues = [issue['_id'] for issue in filtered_issues]
+        # filtered_issues = [issue['_id'] for issue in filtered_issues]
         issues = predictions_db[f'{request.sort["model-id"]}-{request.sort["version-id"]}'].find(
             {'_id': {'$in': filtered_issues}}
-        ).sort({f'{request.sort["class"]}.probability': -1}).skip(page * limit).limit(limit)
+        ).sort(f'{request.sort["class"]}.probability', -1).skip(page * limit).limit(limit)
     else:
         issues = manual_labels_collection.find(request.filter, ['_id']).skip(page * limit).limit(limit)
 
@@ -45,7 +45,7 @@ def get_ui_data(request: Query):
     for issue in issues:
         issue_data = jira_repos_db[issue['_id'].split('-')[0]].find_one(
             {'id': issue['_id'].split('-')[1]},
-            ['key', 'summary', 'description']
+            ['key', 'fields.summary', 'fields.description']
         )
         manual_label = manual_labels_collection.find_one({'_id': issue['_id']})
         predictions = []
@@ -63,8 +63,8 @@ def get_ui_data(request: Query):
         response.append({
             'id': issue['_id'],
             'key': issue_data['key'],
-            'summary': issue_data['summary'],
-            'description': issue_data['description'],
+            'summary': issue_data['fields']['summary'],
+            'description': issue_data['fields']['description'],
             'manual-label': {
                 'existence': manual_label['existence'],
                 'property': manual_label['property'],
