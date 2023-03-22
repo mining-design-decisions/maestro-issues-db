@@ -6,6 +6,7 @@ from app.dependencies import mongo_client, fs, model_info_collection
 from app.routers.authentication import validate_token
 from bson import ObjectId
 from dateutil import parser
+from app.util import read_file_in_chunks
 
 router = APIRouter(
     prefix='/models',
@@ -149,12 +150,6 @@ def get_model_version(model_id: str, version_id: str):
     model = _get_model(model_id, ['versions'])
     for version in model['versions']:
         if version_id == str(version['id']):
-            def read_file_in_chunks(file):
-                while True:
-                    chunk = file.read(1024)
-                    if not chunk:
-                        break
-                    yield chunk
             mongo_file = fs.get(version['id'])
             return StreamingResponse(read_file_in_chunks(mongo_file),
                                      media_type='application/octet-stream')
