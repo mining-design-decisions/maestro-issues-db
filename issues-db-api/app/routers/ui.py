@@ -56,7 +56,7 @@ def get_ui_data(request: Query):
                 })
         response.append({
             'id': issue['_id'],
-            'link': f'{issue_link_prefix}/browse/{issue["key"]}',
+            'link': f'{issue_link_prefix}/browse/{issue_data["key"]}',
             'key': issue_data['key'],
             'summary': issue_data['fields']['summary'],
             'description': issue_data['fields']['description'],
