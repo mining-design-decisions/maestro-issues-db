@@ -119,7 +119,7 @@ def create_model_version(
     _update_model(model_id, {'$push': {
         'versions': {
             'id': version_id,
-            'time': time
+            'time': time.replace('.', '_')
         }
     }})
     return {
@@ -137,7 +137,7 @@ def get_model_versions(model_id: str):
     for version in model['versions']:
         versions.append({
             'id': str(version['id']),
-            'time': version['time']
+            'time': version['time'].replace('_', '.')
         })
     return {'versions': versions}
 
