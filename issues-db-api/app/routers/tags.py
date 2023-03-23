@@ -66,7 +66,7 @@ def add_tags(request: AddTagsIn, token=Depends(validate_token)):
             tags.add(tag)
     allowed_tags = tags_collection.find({'type': 'manual-tag'}, ['_id'])
     allowed_tags = set([tag['_id'] for tag in allowed_tags])
-    if not tags - allowed_tags:
+    if not tags.issubset(allowed_tags):
         return HTTPException(
             status_code=409,
             detail=f'The following tags may not be inserted: {list(tags - allowed_tags)}'
