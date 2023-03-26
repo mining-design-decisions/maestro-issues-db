@@ -24,14 +24,11 @@ services:
     build: ./issues-db-api/
     image: issues-db-api
     ports:
-      - 433:433
       - 8000:8000
     networks:
       - issues-db
     environment:
       - MONGO_URL=mongodb://mongo:27017
-    depends_on:
-      - mongo-express
 
   backup-issues-db:
     container_name: backup-issues-db
