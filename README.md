@@ -14,6 +14,13 @@ pip install pymongo
 python3.10 setup.py
 ```
 
+# Download JiraRepos
+
+```
+pip install gdown
+gdown file-id
+```
+
 # Dump data
 
 ## IssueLabels
@@ -46,4 +53,11 @@ docker exec -i mongo mongorestore --gzip --archive=mongodump-JiraRepos.archive -
 
 ```
 ssh -L 8081:issues-db.nl:8081 arjan@issues-db.nl
+```
+
+# SSL
+
+```
+sudo cp /etc/letsencrypt/live/issues-db.nl/fullchain.pem issues-db-api/fullchain.pem
+sudo cp /etc/letsencrypt/live/issues-db.nl/privkey.pem issues-db-api/privkey.pem
 ```
