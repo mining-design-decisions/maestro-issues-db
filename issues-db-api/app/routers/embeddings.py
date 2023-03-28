@@ -2,7 +2,6 @@ from fastapi import APIRouter, Form, UploadFile, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 from app.routers.authentication import validate_token
 from app.dependencies import embeddings_fs, embeddings_collection
-import json
 from bson import ObjectId
 from app.util import read_file_in_chunks
 from pydantic import BaseModel
@@ -40,20 +39,12 @@ def get_embeddings() -> dict[str, dict]:
 
 
 @router.post('')
-def create_embedding(config: str = Form(),
-                     token=Depends(validate_token)) -> dict[str, str]:
+def create_embedding(request: Config, token=Depends(validate_token)) -> dict[str, str]:
     """
     Create a new embedding with the given config and the uploaded file.
     """
-    try:
-        parsed_config = json.loads(config)
-    except json.JSONDecodeError as e:
-        raise HTTPException(
-            status_code=422,
-            detail=f'Failed to parse the config: {e}'
-        )
     _id = embeddings_collection.insert_one({
-        'config': parsed_config,
+        'config': request.config,
         'file_id': None
     })
     return {
@@ -106,7 +97,7 @@ def update_file(embedding_id: str, file: UploadFile = Form(), token=Depends(vali
 
 
 @router.get('/{embedding_id}/file')
-def get_embedding_file(embedding_id: str):
+def get_file(embedding_id: str):
     """
     Get the embedding file for the given embedding.
     """
