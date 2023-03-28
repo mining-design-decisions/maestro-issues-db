@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 from app.dependencies import manual_labels_collection, jira_repos_db, issue_links_collection
+import math
 
 router = APIRouter(
     prefix='/ui',
@@ -31,6 +32,7 @@ class Query(BaseModel):
 def get_ui_data(request: Query):
     page = request.page - 1
     limit = request.limit
+    total_pages = math.ceil(manual_labels_collection.count_documents(request.filter) / limit)
 
     if request.sort is not None:
         issues = manual_labels_collection.find(request.filter)\
@@ -67,4 +69,4 @@ def get_ui_data(request: Query):
             },
             'predictions': predictions
         })
-    return {'data': response}
+    return {'data': response, 'total-pages': total_pages}
