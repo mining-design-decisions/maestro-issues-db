@@ -34,7 +34,7 @@ def get_embeddings() -> dict[str, dict]:
     embeddings = embeddings_collection.find({}, ['config'])
     response = {}
     for embedding in embeddings:
-        response[str(embedding['_id'])] = embeddings['config']
+        response[str(embedding['_id'])] = embedding['config']
     return response
 
 
@@ -46,7 +46,7 @@ def create_embedding(request: Config, token=Depends(validate_token)) -> dict[str
     _id = embeddings_collection.insert_one({
         'config': request.config,
         'file_id': None
-    })
+    }).inserted_id
     return {
         'embedding-id': str(_id)
     }
@@ -57,10 +57,10 @@ def update_embedding(embedding_id: str, request: Config, token=Depends(validate_
     """
     Update the config of the given embedding.
     """
-    result = embeddings_collection.update_one({
-        '_id': ObjectId(embedding_id),
-        '$set': {'config': request.config}
-    })
+    result = embeddings_collection.update_one(
+        {'_id': ObjectId(embedding_id)},
+        {'$set': {'config': request.config}}
+    )
     if result.matched_count == 0:
         raise HTTPException(
             status_code=404,
@@ -92,7 +92,7 @@ def update_file(embedding_id: str, file: UploadFile = Form(), token=Depends(vali
     file_id = embeddings_fs.put(file.file, filename=file.filename)
     embeddings_collection.update_one(
         {'_id': ObjectId(embedding_id)},
-        {'file_id': file_id}
+        {'$set': {'file_id': file_id}}
     )
 
 
@@ -129,5 +129,5 @@ def delete_file(embedding_id: str, token=Depends(validate_token)):
     embeddings_fs.delete(embedding['file_id'])
     embeddings_collection.update_one(
         {'_id': ObjectId(embedding_id)},
-        {'file_id': None}
+        {'$set': {'file_id': None}}
     )
