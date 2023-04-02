@@ -113,6 +113,6 @@ def get_comments(issue_id: str):
             status_code=404,
             detail=f'Issue "{issue_id}" was not found'
         )
-    if issue['comments'] is None:
+    if 'comments' not in issue:
         return Comments(comments=[])
     return Comments(comments=issue['comments'])
