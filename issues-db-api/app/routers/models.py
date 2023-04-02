@@ -19,29 +19,29 @@ example_request = {
             'ISSUE-ID-1': {
                 "existence": {
                     "prediction": True,
-                    "probability": 0.42
+                    "confidence": 0.42
                 },
                 "property": {
                     "prediction": False,
-                    "probability": 0.42
+                    "confidence": 0.42
                 },
                 "executive": {
                     "prediction": False,
-                    "probability": 0.42
+                    "confidence": 0.42
                 }
             },
             'ISSUE-ID-2': {
                 "existence": {
                     "prediction": False,
-                    "probability": 0.42
+                    "confidence": 0.42
                 },
                 "property": {
                     "prediction": True,
-                    "probability": 0.42
+                    "confidence": 0.42
                 },
                 "executive": {
                     "prediction": False,
-                    "probability": 0.42
+                    "confidence": 0.42
                 }
             },
         }
