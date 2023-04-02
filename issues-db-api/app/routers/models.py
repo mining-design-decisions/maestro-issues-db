@@ -237,16 +237,21 @@ def post_predictions(
             status_code=404,
             detail=f'Version "{version_id}" was not found for model "{model_id}"'
         )
+    classes = set()
     for issue_id, predicted_classes in request.predictions.items():
         predictions = {}
         for predicted_class in predicted_classes:
             predictions[predicted_class] = predicted_classes[predicted_class]
+            classes.add(predicted_class)
         manual_labels_collection.find_one_and_update(
             {'_id': issue_id},
             {'$set': {
                 'predictions': {f'{model_id}-{version_id}': predictions}
             }}
         )
+    for class_ in classes:
+        # Make sure the predictions are indexed for speed
+        manual_labels_collection.create_index(f'predictions.{model_id}-{version_id}.{class_}.confidence')
 
 
 class GetPredictionsIn(BaseModel):
