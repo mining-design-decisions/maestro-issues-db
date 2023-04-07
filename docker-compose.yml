@@ -29,6 +29,7 @@ services:
       - issues-db
     environment:
       - MONGO_URL=mongodb://mongo:27017
+      - DOCKER=True
 
   backup-issues-db:
     container_name: backup-issues-db
@@ -36,6 +37,7 @@ services:
     image: backup-issues-db
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+
 
 networks:
   issues-db:

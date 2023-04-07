@@ -1,7 +1,9 @@
 import typing
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel
 from app.dependencies import jira_repos_db, issue_links_collection
+from app.exceptions import get_attr_required_exception, duplicate_issue_exception, attribute_not_found_exception,\
+    issues_not_found_exception
 
 router = APIRouter(
     prefix='/issue-data',
@@ -15,20 +17,13 @@ default_value = {
     'components': [],
     'votes': 0,
     'watches': 0,
-    'parent': False,
+    'parent': None,
     'issuelinks': [],
     'attachments': [],
     'sub-tasks': [],
     'resolution': None,
     'assignee': None
 }
-
-
-def get_attr_required_exception(attribute: str, issue_id: str):
-    return HTTPException(
-        status_code=409,
-        detail=f'Attribute "{attribute}" is required for issue "{issue_id}"'
-    )
 
 
 class IssueDataIn(BaseModel):
@@ -40,7 +35,7 @@ class IssueDataOut(BaseModel):
     data: dict[str, dict[str, typing.Any]] = {}
 
 
-@router.get('')
+@router.post('')
 def get_issue_data(request: IssueDataIn) -> IssueDataOut:
     """
     Returns issue data. The returned data is determined by the
@@ -66,10 +61,7 @@ def get_issue_data(request: IssueDataIn) -> IssueDataOut:
         remaining_ids = set(ids[jira_name])
         for issue in issues:
             if issue['id'] not in remaining_ids:
-                raise HTTPException(
-                    status_code=409,
-                    detail=f'Duplicate issue in the database: {jira_name}-{issue["id"]}'
-                )
+                raise duplicate_issue_exception(jira_name, issue['id'])
             remaining_ids.remove(issue['id'])
             attributes = {}
             for attr in request.attributes:
@@ -80,13 +72,29 @@ def get_issue_data(request: IssueDataIn) -> IssueDataOut:
                 elif attr == 'link':
                     attributes[attr] = f'{issue_link_prefix}/browse/{issue["key"]}'
                 elif attr not in issue['fields']:
-                    raise HTTPException(
-                        status_code=404,
-                        detail=f'Attribute "{attr}" is not found for issue: {jira_name}-{issue["id"]}'
-                    )
+                    if attr == 'parent':
+                        attributes[attr] = None
+                    else:
+                        raise attribute_not_found_exception(attr, jira_name, issue['id'])
                 elif issue['fields'][attr] is not None:
                     # Attribute exists
-                    attributes[attr] = issue['fields'][attr]
+                    if attr in 'issuelinks':
+                        issuelinks = issue['fields'][attr]
+                        for idx in range(len(issuelinks)):
+                            if 'outwardIssue' in issuelinks[idx]:
+                                issuelinks[idx]['outwardIssue'] = f'{jira_name}-{issuelinks[idx]["outwardIssue"]["id"]}'
+                            if 'inwardIssue' in issuelinks[idx]:
+                                issuelinks[idx]['inwardIssue'] = f'{jira_name}-{issuelinks[idx]["inwardIssue"]["id"]}'
+                        attributes[attr] = issuelinks
+                    elif attr == 'parent':
+                        attributes[attr] = f'{jira_name}-{issue["fields"][attr]["id"]}'
+                    elif attr == 'subtasks':
+                        subtasks = []
+                        for subtask in issue['fields'][attr]:
+                            subtasks.append(f'{jira_name}-{subtask["id"]}')
+                        attributes[attr] = subtasks
+                    else:
+                        attributes[attr] = issue['fields'][attr]
                 elif attr not in list(default_value.keys()):
                     # Attribute does not exist, but is required
                     raise get_attr_required_exception(attr, f'{jira_name}-{issue["id"]}')
@@ -95,11 +103,7 @@ def get_issue_data(request: IssueDataIn) -> IssueDataOut:
                     attributes[attr] = default_value[attr]
             data[f'{jira_name}-{issue["id"]}'] = attributes
         if remaining_ids:
-            raise HTTPException(
-                status_code=404,
-                detail=f'The following issue(s) could not be found: '
-                       f'{[f"{jira_name}-{id_}" for id_ in remaining_ids]}'
-            )
+            raise issues_not_found_exception([f'{jira_name}-{id_}' for id_ in remaining_ids])
     response = IssueDataOut()
     response.data = data
     return response

@@ -1,5 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from app.dependencies import manual_labels_collection
+from app.exceptions import issue_not_found_exception
 from app.routers.authentication import validate_token
 
 router = APIRouter(
@@ -14,10 +15,7 @@ def _update_manual_label(issue_id: str, update: dict):
         update,
     )
     if result.matched_count == 0:
-        raise HTTPException(
-            status_code=404,
-            detail=f'Issue "{issue_id}" was not found'
-        )
+        raise issue_not_found_exception(issue_id)
 
 
 @router.post('/{issue_id}/mark-review')

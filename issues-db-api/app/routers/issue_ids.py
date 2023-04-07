@@ -32,7 +32,7 @@ class IssueIdsOut(BaseModel):
     ids: list[str] = []
 
 
-@router.get('')
+@router.post('')
 def get_issue_ids(request: IssueIdsIn) -> IssueIdsOut:
     """
     Returns the issue ids for which the issue tags match
