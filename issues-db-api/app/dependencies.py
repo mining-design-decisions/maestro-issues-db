@@ -12,6 +12,7 @@ embeddings_fs = gridfs.GridFS(mongo_client['EmbeddingsFS'])
 manual_labels_collection = mongo_client['IssueLabels']['ManualLabels']
 issue_links_collection = mongo_client['IssueLabels']['IssueLinks']
 tags_collection = mongo_client['IssueLabels']['Tags']
+projects_collection = mongo_client['MiningDesignDecisions']['Projects']
 model_info_collection = mongo_client['Models']['ModelInfo']
 users_collection = mongo_client['Users']['Users']
 embeddings_collection = mongo_client['DeepLearning']['Embeddings']

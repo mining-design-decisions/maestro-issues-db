@@ -15,7 +15,7 @@ default_value = {
     'components': [],
     'votes': 0,
     'watches': 0,
-    'parent': False,
+    'parent': None,
     'issuelinks': [],
     'attachments': [],
     'sub-tasks': [],
@@ -80,13 +80,32 @@ def get_issue_data(request: IssueDataIn) -> IssueDataOut:
                 elif attr == 'link':
                     attributes[attr] = f'{issue_link_prefix}/browse/{issue["key"]}'
                 elif attr not in issue['fields']:
-                    raise HTTPException(
-                        status_code=404,
-                        detail=f'Attribute "{attr}" is not found for issue: {jira_name}-{issue["id"]}'
-                    )
+                    if attr == 'parent':
+                        attributes[attr] = None
+                    else:
+                        raise HTTPException(
+                            status_code=404,
+                            detail=f'Attribute "{attr}" is not found for issue: {jira_name}-{issue["id"]}'
+                        )
                 elif issue['fields'][attr] is not None:
                     # Attribute exists
-                    attributes[attr] = issue['fields'][attr]
+                    if attr == 'issuelinks':
+                        issuelinks = issue['fields'][attr]
+                        for idx in range(len(issuelinks)):
+                            if 'outwardIssue' in issuelinks[idx]:
+                                issuelinks[idx]['outwardIssue'] = f'{jira_name}-{issuelinks[idx]["outwardIssue"]["id"]}'
+                            if 'inwardIssue' in issuelinks[idx]:
+                                issuelinks[idx]['inwardIssue'] = f'{jira_name}-{issuelinks[idx]["inwardIssue"]["id"]}'
+                        attributes[attr] = issuelinks
+                    elif attr == 'parent':
+                        attributes[attr] = f'{jira_name}-{issue["fields"][attr]["id"]}'
+                    elif attr == 'subtasks':
+                        subtasks = []
+                        for subtask in issue['fields'][attr]:
+                            subtasks.append(f'{jira_name}-{subtask["id"]}')
+                        attributes[attr] = subtasks
+                    else:
+                        attributes[attr] = issue['fields'][attr]
                 elif attr not in list(default_value.keys()):
                     # Attribute does not exist, but is required
                     raise get_attr_required_exception(attr, f'{jira_name}-{issue["id"]}')

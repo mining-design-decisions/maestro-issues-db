@@ -1,11 +1,12 @@
 from fastapi import FastAPI
 from app.routers import tags, issue_data, issue_ids, manual_labels,\
-    models, issues, authentication, embeddings, ui
+    models, issues, authentication, embeddings, ui, repos
 from app.config import SSL_KEYFILE, SSL_CERTFILE
 import uvicorn
 
 app = FastAPI()
 
+app.include_router(repos.router)
 app.include_router(embeddings.router)
 app.include_router(tags.router)
 app.include_router(issue_data.router)
