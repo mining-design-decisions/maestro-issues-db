@@ -6,7 +6,8 @@ from app.dependencies import fs, model_collection, manual_labels_collection
 from app.routers.authentication import validate_token
 from bson import ObjectId
 from app.util import read_file_in_chunks
-from app.exceptions import model_not_found_exception, version_not_found_exception, performance_not_found_exception
+from app.exceptions import model_not_found_exception, version_not_found_exception, performance_not_found_exception,\
+    issue_not_found_exception
 
 router = APIRouter(
     prefix='/models',
@@ -131,7 +132,7 @@ def _delete_predictions(model_id: str, version_id: ObjectId):
     for key, value in indexes.items():
         for col in value['key']:
             if f'predictions.{model_id}-{version_id}' in col[0]:
-                manual_labels_collection.drop_index(col[0])
+                manual_labels_collection.drop_index(key)
                 break
 
 
@@ -267,7 +268,7 @@ def delete_version(model_id: str, version_id: str, token=Depends(validate_token)
     for version in model['versions']:
         if version_id == str(version['id']):
             _delete_version(model_id, version['id'])
-        return
+            return
     raise version_not_found_exception(version_id, model_id)
 
 
@@ -285,22 +286,21 @@ def post_predictions(
     model = _get_model(model_id, ['versions'])
     versions = [str(version['id']) for version in model['versions']]
     if version_id not in versions:
-        raise HTTPException(
-            status_code=404,
-            detail=f'Version "{version_id}" was not found for model "{model_id}"'
-        )
+        raise version_not_found_exception(version_id, model_id)
     classes = set()
     for issue_id, predicted_classes in request.predictions.items():
         predictions = {}
         for predicted_class in predicted_classes:
             predictions[predicted_class] = predicted_classes[predicted_class]
             classes.add(predicted_class)
-        manual_labels_collection.find_one_and_update(
+        result = manual_labels_collection.update_one(
             {'_id': issue_id},
             {'$set': {
                 'predictions': {f'{model_id}-{version_id}': predictions}
             }}
         )
+        if result.matched_count != 1:
+            raise issue_not_found_exception(issue_id)
     for class_ in classes:
         # Make sure the predictions are indexed for speed
         manual_labels_collection.create_index(f'predictions.{model_id}-{version_id}.{class_}.confidence')
@@ -320,13 +320,16 @@ def get_predictions(model_id: str, version_id: str, request: GetPredictionsIn):
         ]}
     issues = manual_labels_collection.find(filter_, [f'predictions.{model_id}-{version_id}'])
     predictions = dict()
-    remaining_ids = set(request.ids)
+    if request.ids is not None:
+        remaining_ids = set(request.ids)
     for issue in issues:
         issue_id = issue.pop('_id')
         predictions[issue_id] = issue['predictions'][f'{model_id}-{version_id}']
-        remaining_ids.remove(issue_id)
-    for issue_id in remaining_ids:
-        predictions[issue_id] = None
+        if request.ids is not None:
+            remaining_ids.remove(issue_id)
+    if request.ids is not None:
+        for issue_id in remaining_ids:
+            predictions[issue_id] = None
     return GetPredictionsOut(predictions=predictions)
 
 
@@ -336,7 +339,7 @@ def delete_predictions(model_id: str, version_id: str, token=Depends(validate_to
     for version in model['versions']:
         if version_id == str(version['id']):
             _delete_predictions(model_id, version['id'])
-        return
+            return
     raise version_not_found_exception(version_id, model_id)
 
 

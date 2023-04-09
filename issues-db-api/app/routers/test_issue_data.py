@@ -2,17 +2,12 @@ from fastapi.testclient import TestClient
 
 from app import app
 from app.dependencies import jira_repos_db, issue_links_collection
+from .test_util import restore_dbs
 
 client = TestClient(app.app)
 
 
-def restore_db():
-    jira_repos_db['Apache'].delete_many({})
-    issue_links_collection.delete_many({})
-
-
 def setup_db():
-    restore_db()
     jira_repos_db['Apache'].insert_one({
         'id': '13211409',
         'key': 'YARN-9230',
@@ -27,7 +22,9 @@ def setup_db():
 
 
 def test_issue_data_endpoint():
+    restore_dbs()
     setup_db()
+
     response = client.post(
         '/issue-data',
         json={
@@ -135,4 +132,4 @@ def test_issue_data_endpoint():
     )
     assert response.status_code == 404
 
-    restore_db()
+    restore_dbs()

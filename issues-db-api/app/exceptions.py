@@ -8,6 +8,13 @@ def tag_exists_exception(tag: str):
     )
 
 
+def tag_not_found_exception(tag: str):
+    return HTTPException(
+        status_code=404,
+        detail=f'Tag {tag} not found'
+    )
+
+
 def tag_exists_for_issue_exception(tag: str, issue_id: str):
     return HTTPException(
         status_code=409,
@@ -17,8 +24,15 @@ def tag_exists_for_issue_exception(tag: str, issue_id: str):
 
 def non_existing_tag_for_issue_exception(tag: str, issue_id: str):
     return HTTPException(
-        status_code=409,
+        status_code=404,
         detail=f'Tag {tag} does not exist for issue {issue_id}'
+    )
+
+
+def illegal_tag_insertion_exception(tag: str):
+    return HTTPException(
+        status_code=404,
+        detail=f'The following tag may not be inserted: {tag}, because it does not exist'
     )
 
 
@@ -117,4 +131,11 @@ def comment_not_found_exception(comment_id: str, issue_id: str):
     return HTTPException(
         status_code=404,
         detail=f'Comment {comment_id} not found for issue {issue_id}'
+    )
+
+
+def repo_not_found_exception(repo_name: str):
+    return HTTPException(
+        status_code=404,
+        detail=f'Jira repository {repo_name} not found'
     )

@@ -13,6 +13,7 @@ fs = gridfs.GridFS(mongo_client['MiningDesignDecisions'])
 manual_labels_collection = mongo_client['MiningDesignDecisions']['IssueLabels']
 issue_links_collection = mongo_client['MiningDesignDecisions']['IssueLinks']
 tags_collection = mongo_client['MiningDesignDecisions']['Tags']
+projects_collection = mongo_client['MiningDesignDecisions']['Projects']
 model_collection = mongo_client['MiningDesignDecisions']['DLModels']
 embeddings_collection = mongo_client['MiningDesignDecisions']['DLEmbeddings']
 users_collection = mongo_client['Users']['Users']

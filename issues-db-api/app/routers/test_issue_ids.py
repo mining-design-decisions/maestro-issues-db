@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 
 from app import app
-from app.dependencies import manual_labels_collection
+from app.dependencies import manual_labels_collection, jira_repos_db
 
 client = TestClient(app.app)
 
@@ -25,6 +25,13 @@ def setup_db():
         'property': False,
         'executive': True,
         'tags': ['Tag-01', 'Tag-02']
+    })
+    jira_repos_db['Apache'].insert_one({
+        'id': '13211409',
+        'key': 'YARN-9230',
+        'fields': {
+            'summary': 'Write a go hdfs driver for Docker Registry'
+        }
     })
 
 
@@ -60,5 +67,9 @@ def test_issue_ids_endpoint():
     )
     assert response.status_code == 200
     assert response.json() == {'ids': []}
+
+    response = client.get('/issue-ids/Apache/YARN-9230')
+    assert response.status_code == 200
+    assert response.json() == {'id': 'Apache-13211409'}
 
     restore_db()
