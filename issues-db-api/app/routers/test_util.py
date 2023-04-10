@@ -13,6 +13,10 @@ def setup_users_db():
         '_id': 'test',
         'hashed_password': get_password_hash('test')
     })
+    users_collection.insert_one({
+        '_id': 'other-user',
+        'hashed_password': get_password_hash('other-user')
+    })
 
 
 def restore_dbs():
@@ -34,6 +38,17 @@ def get_auth_header():
         files={
             'username': (None, 'test'),
             'password': (None, 'test')
+        }
+    )
+    return {'Authorization': f'bearer {response.json()["access_token"]}'}
+
+
+def get_auth_header_other_user():
+    response = client.post(
+        '/token',
+        files={
+            'username': (None, 'other-user'),
+            'password': (None, 'other-user')
         }
     )
     return {'Authorization': f'bearer {response.json()["access_token"]}'}

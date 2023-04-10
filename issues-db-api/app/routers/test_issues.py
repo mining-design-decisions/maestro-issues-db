@@ -48,7 +48,7 @@ def test_mark_and_finish_review():
     restore_dbs()
 
 
-def get_tags():
+def test_get_tags():
     restore_dbs()
     setup_db()
 

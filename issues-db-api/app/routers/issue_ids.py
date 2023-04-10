@@ -30,11 +30,15 @@ class IssueIdsIn(BaseModel):
 
 
 class IssueIdsOut(BaseModel):
-    ids: list[str] = []
+    issue_ids: list[str]
 
 
-@router.post('')
-def get_issue_ids(request: IssueIdsIn) -> IssueIdsOut:
+class IssueIdOut(BaseModel):
+    issue_id: str
+
+
+@router.get('', response_model=IssueIdsOut)
+def get_issue_ids(request: IssueIdsIn):
     """
     Returns the issue ids for which the issue tags match
     the provided filtering options. These filtering options are
@@ -44,14 +48,14 @@ def get_issue_ids(request: IssueIdsIn) -> IssueIdsOut:
         request.filter,
         ['_id']
     )
-    return IssueIdsOut(ids=[issue['_id'] for issue in issues])
+    return IssueIdsOut(issue_ids=[issue['_id'] for issue in issues])
 
 
-@router.get('/{repo_name}/{issue_key}')
+@router.get('/{repo_name}/{issue_key}', response_model=IssueIdOut)
 def get_issue_id_from_key(repo_name: str, issue_key: str):
     if repo_name not in jira_repos_db.list_collection_names():
         raise repo_not_found_exception(repo_name)
     issue = jira_repos_db[repo_name].find_one({'key': issue_key})
     if issue is None:
         raise issue_not_found_exception(issue_key)
-    return {'id': f'{repo_name}-{issue["id"]}'}
+    return IssueIdOut(issue_id=f'{repo_name}-{issue["id"]}')

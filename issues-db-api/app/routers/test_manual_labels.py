@@ -1,7 +1,11 @@
 from .test_util import client
-from app.dependencies import manual_labels_collection, users_collection
-from .test_util import setup_users_db, restore_dbs, get_auth_header, auth_test_post, auth_test_patch, auth_test_delete
+from app.dependencies import manual_labels_collection
+from .test_util import setup_users_db, restore_dbs, get_auth_header, auth_test_post, auth_test_patch, auth_test_delete,\
+    get_auth_header_other_user
+from .manual_labels import get_manual_labels, ManualLabelsIn
 from bson import ObjectId
+import pytest
+from fastapi import HTTPException
 
 
 def setup_db():
@@ -14,171 +18,188 @@ def setup_db():
     })
 
 
-def label():
-    # Update label
-    headers = get_auth_header()
-    auth_test_post('/manual-labels/Apache-01')
-    response = client.post(
-        '/manual-labels/Apache-01',
-        headers=headers,
-        json={'existence': True, 'property': True, 'executive': False}
-    )
-    assert response.status_code == 200
-
-    # Make sure author tag is added
-    response = client.post(
-        '/issue-ids',
-        json={'filter': {'tags': 'test'}}
-    )
-    assert response.json() == {'ids': ['Apache-01']}
-
-    response = client.post(
-        '/manual-labels/Apache-02',
-        headers=headers,
-        json={'existence': True, 'property': True, 'executive': False}
-    )
-    assert response.status_code == 404
+def test_get_manual_labels():
+    restore_dbs()
+    setup_db()
 
     # Get label
-    response = client.post(
-        '/manual-labels',
-        json={'ids': ['Apache-01']}
-    )
-    assert response.status_code == 200
-    assert response.json() == {
-        'labels': {
-            'Apache-01': {
-                'existence': True,
-                'property': True,
-                'executive': False
+    assert get_manual_labels(ManualLabelsIn(issue_ids=['Apache-01'])) == {
+        'manual_labels': [{
+            'issue_id': 'Apache-01',
+            'manual_label': {
+                'existence': False,
+                'property': False,
+                'executive': True
             }
-        }
+        }]
     }
 
-    response = client.post(
-        '/manual-labels',
-        json={'ids': ['Apache-02']}
-    )
-    assert response.status_code == 404
+    # Get label of non-existing issue
+    with pytest.raises(HTTPException):
+        get_manual_labels(ManualLabelsIn(issue_ids=['Apache-02']))
+
+    restore_dbs()
 
 
-def comment():
-    # No comments for the issue
-    response = client.get('/manual-labels/Apache-01/comments')
-    assert response.json() == {'comments': {}}
+def test_update_manual_label():
+    restore_dbs()
+    setup_users_db()
+    setup_db()
+
+    auth_test_post('/manual-labels/Apache-01')
+    headers = get_auth_header()
+
+    # Update manual label
+    payload = {'existence': True, 'property': True, 'executive': False}
+    assert client.post('/manual-labels/Apache-01', headers=headers, json=payload).status_code == 200
+    assert manual_labels_collection.find_one({'_id': 'Apache-01'}) == {
+        '_id': 'Apache-01',
+        'existence': True,
+        'property': True,
+        'executive': False,
+        'tags': ['has-label', 'test']
+    }
 
     # Non-existing issue
-    response = client.get('/manual-labels/Apache-02/comments')
-    assert response.status_code == 404
+    assert client.post('/manual-labels/Apache-02', headers=headers, json=payload).status_code == 404
 
-    auth_test_post('manual-labels/Apache-01/comments')
+    restore_dbs()
+
+
+def test_get_comments():
+    restore_dbs()
+    comment_id = ObjectId()
+    manual_labels_collection.insert_one({
+        '_id': 'Apache-01',
+        'comments': {
+            str(comment_id): {
+                'author': 'test',
+                'comment': 'text'
+            }
+        }
+    })
+
+    # Get comments
+    assert client.get('/manual-labels/Apache-01/comments').json() == {
+        'comments': [{
+            'comment_id': str(comment_id),
+            'author': 'test',
+            'comment': 'text'
+        }]
+    }
+
+    # Non-existing issue
+    assert client.get('/manual-labels/Apache-02/comments').status_code == 404
+
+    # No comments
+    manual_labels_collection.insert_one({'_id': 'Apache-02'})
+    assert client.get('/manual-labels/Apache-02/comments').json() == {'comments': []}
+
+    restore_dbs()
+
+
+def test_add_comment():
+    restore_dbs()
+    setup_users_db()
+    setup_db()
+
+    auth_test_post('/manual-labels/Apache-01/comments')
+    headers = get_auth_header()
 
     # Add comment
-    headers = get_auth_header()
-    response = client.post(
-        'manual-labels/Apache-01/comments',
-        headers=headers,
-        json={'comment': 'Test comment'}
-    )
-    assert response.status_code == 200
-    comment_id = response.json()['id']
-
-    # Make sure comment is inserted
-    response = client.get('manual-labels/Apache-01/comments')
-    assert response.json() == {
+    payload = {'comment': 'text'}
+    comment_id = client.post('/manual-labels/Apache-01/comments', headers=headers, json=payload).json()['comment_id']
+    assert manual_labels_collection.find_one({'_id': 'Apache-01'}, ['comments', 'tags']) == {
+        '_id': 'Apache-01',
         'comments': {
             comment_id: {
                 'author': 'test',
-                'comment': 'Test comment'
+                'comment': 'text'
             }
-        }
+        },
+        'tags': ['has-label', 'test']
     }
 
-    # Make sure author tag is added
-    response = client.post(
-        '/issue-ids',
-        json={'filter': {'tags': 'test'}}
-    )
-    assert response.json() == {'ids': ['Apache-01']}
-
     # Non-existing issue
-    response = client.post(
-        'manual-labels/Apache-02/comments',
-        headers=headers,
-        json={'comment': 'Test comment'}
-    )
-    assert response.status_code == 404
+    assert client.post('/manual-labels/Apache-02/comments', headers=headers, json=payload).status_code == 404
 
-    # Test updating a comment
+    restore_dbs()
+
+
+def test_update_comment():
+    restore_dbs()
+    setup_users_db()
+    comment_id = ObjectId()
+    manual_labels_collection.insert_one({
+        '_id': 'Apache-01',
+        'comments': {
+            str(comment_id): {
+                'author': 'test',
+                'comment': 'text'
+            }
+        }
+    })
+
     auth_test_patch(f'/manual-labels/Apache-01/comments/{comment_id}')
+    headers = get_auth_header()
 
-    response = client.patch(
-        f'/manual-labels/Apache-01/comments/{comment_id}',
-        headers=headers,
-        json={'comment': 'Updated comment'}
-    )
+    # Update comment
+    payload = {'comment': 'new-text'}
+    response = client.patch(f'/manual-labels/Apache-01/comments/{comment_id}', headers=headers, json=payload)
     assert response.status_code == 200
-
-    # Make sure comment is updated
-    response = client.get('manual-labels/Apache-01/comments')
-    assert response.json() == {
+    assert manual_labels_collection.find_one({'_id': 'Apache-01'}, ['comments', 'tags']) == {
+        '_id': 'Apache-01',
         'comments': {
-            comment_id: {
+            str(comment_id): {
                 'author': 'test',
-                'comment': 'Updated comment'
+                'comment': 'new-text'
             }
         }
     }
 
     # Non-existing issue
-    response = client.patch(
-        f'manual-labels/Apache-02/comments/{comment_id}',
-        headers=headers,
-        json={'comment': 'Updated comment'}
-    )
+    response = client.patch(f'/manual-labels/Apache-02/comments/{comment_id}', headers=headers, json=payload)
     assert response.status_code == 404
 
     # Non-existing comment
-    random_id = ObjectId()
-    response = client.patch(
-        f'manual-labels/Apache-02/comments/{random_id}',
-        headers=headers,
-        json={'comment': 'Updated comment'}
-    )
+    response = client.patch(f'/manual-labels/Apache-01/comments/{ObjectId()}', headers=headers, json=payload)
     assert response.status_code == 404
 
-    # Test deleting a comment
+    # Edit comment of other user
+    other_headers = get_auth_header_other_user()
+    response = client.patch(f'/manual-labels/Apache-01/comments/{comment_id}', headers=other_headers, json=payload)
+    assert response.status_code == 403
+
+    restore_dbs()
+
+
+def test_delete_comment():
+    restore_dbs()
+    setup_users_db()
+    comment_id = ObjectId()
+    manual_labels_collection.insert_one({
+        '_id': 'Apache-01',
+        'comments': {
+            str(comment_id): {
+                'author': 'test',
+                'comment': 'text'
+            }
+        }
+    })
+
     auth_test_delete(f'/manual-labels/Apache-01/comments/{comment_id}')
-    response = client.delete(
-        f'/manual-labels/Apache-01/comments/{comment_id}',
-        headers=headers
-    )
-    assert response.status_code == 200
+    headers = get_auth_header()
 
-    # Non-existing comment
-    response = client.delete(
-        f'/manual-labels/Apache-01/comments/{comment_id}',
-        headers=headers
-    )
-    assert response.status_code == 404
+    # Delete comment of other user
+    other_headers = get_auth_header_other_user()
+    assert client.delete(f'/manual-labels/Apache-01/comments/{comment_id}', headers=other_headers).status_code == 403
+    assert manual_labels_collection.find_one({f'comments.{str(comment_id)}': {'$exists': True}}) is not None
 
-    # Non-existing issue
-    response = client.delete(
-        f'/manual-labels/Apache-02/comments/{comment_id}',
-        headers=headers
-    )
-    assert response.status_code == 404
+    # Delete comment
+    assert client.delete(f'/manual-labels/Apache-01/comments/{comment_id}', headers=headers).status_code == 200
+    assert manual_labels_collection.find_one({f'comments.{str(comment_id)}': {'$exists': True}}) is None
 
-
-def test_manual_labels_endpoints():
-    restore_dbs()
-    setup_users_db()
-    setup_db()
-    label()
-
-    restore_dbs()
-    setup_users_db()
-    setup_db()
-    comment()
+    # Delete non-existing comment
+    assert client.delete(f'/manual-labels/Apache-01/comments/{comment_id}', headers=headers).status_code == 404
 
     restore_dbs()

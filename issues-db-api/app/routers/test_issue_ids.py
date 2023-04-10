@@ -1,17 +1,9 @@
-from fastapi.testclient import TestClient
-
-from app import app
 from app.dependencies import manual_labels_collection, jira_repos_db
-
-client = TestClient(app.app)
-
-
-def restore_db():
-    manual_labels_collection.delete_many({})
+from .test_util import client, restore_dbs
+from .issue_ids import get_issue_ids, IssueIdsIn
 
 
 def setup_db():
-    restore_db()
     manual_labels_collection.insert_one({
         '_id': 'Apache-01',
         'existence': False,
@@ -35,41 +27,33 @@ def setup_db():
     })
 
 
-def test_issue_ids_endpoint():
+def test_get_issue_ids():
+    restore_dbs()
     setup_db()
 
-    # Test 2 matches
-    response = client.post(
-        '/issue-ids',
-        json={
-            'filter': {'tags': 'Tag-01'}
-        }
-    )
-    assert response.status_code == 200
-    assert response.json() == {'ids': ['Apache-01', 'Apache-02']}
+    # Test two matches
+    assert get_issue_ids(IssueIdsIn(filter={'tags': 'Tag-01'})) == {'issue_ids': ['Apache-01', 'Apache-02']}
 
-    # Test 1 match
-    response = client.post(
-        '/issue-ids',
-        json={
-            'filter': {'tags': 'Tag-02'}
-        }
-    )
-    assert response.status_code == 200
-    assert response.json() == {'ids': ['Apache-02']}
+    # Test one match
+    assert get_issue_ids(IssueIdsIn(filter={'tags': 'Tag-02'})) == {'issue_ids': ['Apache-02']}
 
     # Test no matches
-    response = client.post(
-        '/issue-ids',
-        json={
-            'filter': {'tags': 'Tag-03'}
-        }
-    )
-    assert response.status_code == 200
-    assert response.json() == {'ids': []}
+    assert get_issue_ids(IssueIdsIn(filter={'tags': 'Tag-03'})) == {'issue_ids': []}
 
-    response = client.get('/issue-ids/Apache/YARN-9230')
-    assert response.status_code == 200
-    assert response.json() == {'id': 'Apache-13211409'}
+    restore_dbs()
 
-    restore_db()
+
+def test_get_issue_id_from_key():
+    restore_dbs()
+    setup_db()
+
+    # Get id from key
+    assert client.get('/issue-ids/Apache/YARN-9230').json() == {'issue_id': 'Apache-13211409'}
+
+    # Repo not found
+    assert client.get('/issue-ids/Jira/YARN-9230').status_code == 404
+
+    # Issue not found
+    assert client.get('/issue-ids/Apache/YARN-9231').status_code == 404
+
+    restore_dbs()

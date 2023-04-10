@@ -139,3 +139,10 @@ def repo_not_found_exception(repo_name: str):
         status_code=404,
         detail=f'Jira repository {repo_name} not found'
     )
+
+
+def comment_author_exception(comment_id: str, issue_id: str):
+    return HTTPException(
+        status_code=403,
+        detail=f'You are not the author of comment {comment_id} of issue {issue_id}'
+    )

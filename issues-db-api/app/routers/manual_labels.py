@@ -4,7 +4,8 @@ from pydantic import BaseModel
 from app.dependencies import manual_labels_collection
 from app.routers.authentication import validate_token
 from app.routers.issues import _update_manual_label
-from app.exceptions import issue_not_found_exception, manual_labels_not_found_exception, comment_not_found_exception
+from app.exceptions import issue_not_found_exception, manual_labels_not_found_exception, comment_not_found_exception,\
+    comment_author_exception
 from bson import ObjectId
 
 router = APIRouter(
@@ -14,7 +15,7 @@ router = APIRouter(
 
 
 class ManualLabelsIn(BaseModel):
-    ids: list[str]
+    issue_ids: list[str]
 
 
 class Label(typing.TypedDict):
@@ -23,19 +24,34 @@ class Label(typing.TypedDict):
     executive: bool | None
 
 
+class ManualLabelOut(BaseModel):
+    issue_id: str
+    manual_label: Label
+
+
 class ManualLabelsOut(BaseModel):
-    labels: dict[str, Label] = {}
+    manual_labels: list[ManualLabelOut]
 
 
-class Comment(BaseModel):
+class CommentIn(BaseModel):
     comment: str
 
 
-class Comments(BaseModel):
-    comments: dict[str, dict[str, str]]
+class CommentOut(BaseModel):
+    comment_id: str
+    author: str
+    comment: str
 
 
-def _update_comment(issue_id, comment_id, username, update):
+class CommentsOut(BaseModel):
+    comments: list[CommentOut]
+
+
+class CommentIdOut(BaseModel):
+    comment_id: str
+
+
+def _update_comment(issue_id: str, comment_id: str, username: str, update: dict):
     result = manual_labels_collection.update_one(
         {
             '_id': issue_id,
@@ -45,14 +61,17 @@ def _update_comment(issue_id, comment_id, username, update):
         update
     )
     if result.modified_count != 1:
-        if manual_labels_collection.find_one({'_id': issue_id}) is None:
+        issue = manual_labels_collection.find_one({'_id': issue_id})
+        if issue is None:
             raise issue_not_found_exception(issue_id)
-        else:
+        elif 'comments' not in issue or comment_id not in issue['comments']:
             raise comment_not_found_exception(comment_id, issue_id)
+        else:
+            raise comment_author_exception(comment_id, issue_id)
 
 
-@router.post('', response_model=ManualLabelsOut)
-def manual_labels(request: ManualLabelsIn) -> ManualLabelsOut:
+@router.get('', response_model=ManualLabelsOut)
+def get_manual_labels(request: ManualLabelsIn):
     """
     Returns the manual labels of the issue ids that were
     provided in the request body.
@@ -60,7 +79,7 @@ def manual_labels(request: ManualLabelsIn) -> ManualLabelsOut:
     issues = manual_labels_collection.find(
         {
             '$and': [
-                {'_id': {'$in': request.ids}},
+                {'_id': {'$in': request.issue_ids}},
                 {'tags': 'has-label'},
             ]
         },
@@ -68,18 +87,21 @@ def manual_labels(request: ManualLabelsIn) -> ManualLabelsOut:
     )
 
     # Build and send response
-    labels = {}
-    ids = set(request.ids)
+    labels = []
+    ids = set(request.issue_ids)
     for issue in issues:
         ids.remove(issue['_id'])
-        labels[issue['_id']] = {
-            'existence': issue['existence'],
-            'property': issue['property'],
-            'executive': issue['executive']
-        }
+        labels.append({
+            'issue_id': issue['_id'],
+            'manual_label': {
+                'existence': issue['existence'],
+                'property': issue['property'],
+                'executive': issue['executive']
+            }
+        })
     if ids:
         raise manual_labels_not_found_exception(list(ids))
-    return ManualLabelsOut(labels=labels)
+    return ManualLabelsOut(manual_labels=labels)
 
 
 @router.post('/{issue_id}')
@@ -98,7 +120,7 @@ def update_manual_label(issue_id: str, request: Label, token=Depends(validate_to
         raise issue_not_found_exception(issue_id)
 
 
-@router.get('/{issue_id}/comments', response_model=Comments)
+@router.get('/{issue_id}/comments', response_model=CommentsOut)
 def get_comments(issue_id: str):
     """
     Gets the comments for the specified issue.
@@ -110,12 +132,19 @@ def get_comments(issue_id: str):
     if issue is None:
         raise issue_not_found_exception(issue_id)
     if 'comments' not in issue or issue['comments'] is None:
-        return Comments(comments={})
-    return Comments(comments=issue['comments'])
+        return CommentsOut(comments=[])
+    comments = []
+    for comment_id in issue['comments']:
+        comments.append(CommentOut(
+            comment_id=str(comment_id),
+            author=issue['comments'][comment_id]['author'],
+            comment=issue['comments'][comment_id]['comment']
+        ))
+    return CommentsOut(comments=comments)
 
 
-@router.post('/{issue_id}/comments')
-def add_comment(issue_id: str, request: Comment, token=Depends(validate_token)):
+@router.post('/{issue_id}/comments', response_model=CommentIdOut)
+def add_comment(issue_id: str, request: CommentIn, token=Depends(validate_token)):
     """
     Adds a comment to the manual label of the given issue.
     """
@@ -132,11 +161,11 @@ def add_comment(issue_id: str, request: Comment, token=Depends(validate_token)):
             '$addToSet': {'tags': token['username']}
         }
     )
-    return {'id': str(comment_id)}
+    return CommentIdOut(comment_id=str(comment_id))
 
 
 @router.patch('/{issue_id}/comments/{comment_id}')
-def update_comment(issue_id: str, comment_id: str, request: Comment, token=Depends(validate_token)):
+def update_comment(issue_id: str, comment_id: str, request: CommentIn, token=Depends(validate_token)):
     _update_comment(
         issue_id,
         comment_id,
