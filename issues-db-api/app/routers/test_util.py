@@ -2,7 +2,7 @@ from fastapi.testclient import TestClient
 
 from app import app
 from app.dependencies import users_collection, manual_labels_collection, model_collection, jira_repos_db,\
-    issue_links_collection, projects_collection, tags_collection
+    issue_links_collection, projects_collection, tags_collection, mining_add_db, embeddings_collection
 from .authentication import get_password_hash
 
 client = TestClient(app.app)
@@ -23,6 +23,9 @@ def restore_dbs():
     issue_links_collection.delete_many({})
     projects_collection.delete_many({})
     tags_collection.delete_many({})
+    mining_add_db['fs_file'].drop()
+    mining_add_db['fs_chunks'].drop()
+    embeddings_collection.drop()
 
 
 def get_auth_header():

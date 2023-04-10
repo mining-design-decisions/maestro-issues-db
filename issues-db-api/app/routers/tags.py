@@ -1,11 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from app.dependencies import manual_labels_collection, tags_collection
+from app.dependencies import tags_collection, projects_collection
 from app.routers.authentication import validate_token
 from pymongo.errors import DuplicateKeyError
-from app.exceptions import tag_exists_exception, illegal_tags_insertion_exception, issues_not_found_exception,\
-    issue_not_found_exception, tag_exists_for_issue_exception, non_existing_tag_for_issue_exception,\
-    illegal_tag_insertion_exception, tag_not_found_exception
+from app.exceptions import tag_exists_exception, tag_not_found_exception
 
 router = APIRouter(
     prefix='/tags',
@@ -61,6 +59,8 @@ def create_tag(tag: NewTag, token=Depends(validate_token)):
     """
     Create a new manual tag with the given description.
     """
+    if projects_collection.find_one({'_id': tag.tag}) is not None:
+        raise tag_exists_exception(tag.tag)
     try:
         tags_collection.insert_one({
             '_id': tag.tag,

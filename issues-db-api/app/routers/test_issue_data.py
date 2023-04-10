@@ -1,7 +1,10 @@
 from fastapi.testclient import TestClient
+from fastapi import HTTPException
+import pytest
 
 from app import app
 from app.dependencies import jira_repos_db, issue_links_collection
+from .issue_data import get_issue_data, IssueDataIn
 from .test_util import restore_dbs
 
 client = TestClient(app.app)
@@ -25,43 +28,40 @@ def test_issue_data_endpoint():
     restore_dbs()
     setup_db()
 
-    response = client.post(
-        '/issue-data',
-        json={
-            'ids': ['Apache-13211409'],
-            'attributes': ['key', 'link', 'summary']
-        }
-    )
-    assert response.status_code == 200
-    assert response.json() == {
-        'data': {
-            'Apache-13211409': {
-                'key': 'YARN-9230',
-                'link': 'https://issues.apache.org/jira/browse/YARN-9230',
-                'summary': 'Write a go hdfs driver for Docker Registry'
-            }
-        }
+    assert get_issue_data(IssueDataIn(issue_ids=['Apache-13211409'], attributes=['key', 'link', 'summary'])) == {
+        'data': [{
+            'issue_id': 'Apache-13211409',
+            'attributes': [{
+                'name': 'key',
+                'value': 'YARN-9230'
+            }, {
+                'name': 'link',
+                'value': 'https://issues.apache.org/jira/browse/YARN-9230'
+            }, {
+                'name': 'summary',
+                'value': 'Write a go hdfs driver for Docker Registry'
+            }]
+        }]
     }
 
     # Test attribute not found
-    response = client.post(
-        '/issue-data',
-        json={
-            'ids': ['Apache-13211409'],
-            'attributes': ['non-existing-attribute']
-        }
-    )
-    assert response.status_code == 404
+    with pytest.raises(HTTPException):
+        get_issue_data(IssueDataIn(issue_ids=['Apache-13211409'], attributes=['non-existing-attribute']))
+
+    # Test parent attribute
+    assert get_issue_data(IssueDataIn(issue_ids=['Apache-13211409'], attributes=['parent'])) == {
+        'data': [{
+            'issue_id': 'Apache-13211409',
+            'attributes': [{
+                'name': 'parent',
+                'value': None
+            }]
+        }]
+    }
 
     # Test non-existing issue
-    response = client.post(
-        '/issue-data',
-        json={
-            'ids': ['Apache-0'],
-            'attributes': ['key']
-        }
-    )
-    assert response.status_code == 404
+    with pytest.raises(HTTPException):
+        get_issue_data(IssueDataIn(issue_ids=['Apache-0'], attributes=['key']))
 
     # Test key is None
     jira_repos_db['Apache'].insert_one({
@@ -72,41 +72,23 @@ def test_issue_data_endpoint():
             'required_attr': None
         }
     })
-    response = client.post(
-        '/issue-data',
-        json={
-            'ids': ['Apache-13211410'],
-            'attributes': ['key']
-        }
-    )
-    assert response.status_code == 409
+    with pytest.raises(HTTPException):
+        get_issue_data(IssueDataIn(issue_ids=['Apache-13211410'], attributes=['key']))
 
     # Test default value
-    response = client.post(
-        '/issue-data',
-        json={
-            'ids': ['Apache-13211410'],
-            'attributes': ['summary']
-        }
-    )
-    assert response.status_code == 200
-    assert response.json() == {
-        'data': {
-            'Apache-13211410': {
-                'summary': ''
-            }
-        }
+    assert get_issue_data(IssueDataIn(issue_ids=['Apache-13211410'], attributes=['summary'])) == {
+        'data': [{
+            'issue_id': 'Apache-13211410',
+            'attributes': [{
+                'name': 'summary',
+                'value': ''
+            }]
+        }]
     }
 
     # Test required attribute
-    response = client.post(
-        '/issue-data',
-        json={
-            'ids': ['Apache-13211410'],
-            'attributes': ['required_attr']
-        }
-    )
-    assert response.status_code == 409
+    with pytest.raises(HTTPException):
+        get_issue_data(IssueDataIn(issue_ids=['Apache-13211410'], attributes=['required_attr']))
 
     # Test duplicate issue exception
     jira_repos_db['Apache'].insert_one({
@@ -123,13 +105,7 @@ def test_issue_data_endpoint():
             'summary': 'Write a go hdfs driver for Docker Registry'
         }
     })
-    response = client.post(
-        '/issue-data',
-        json={
-            'ids': ['Apache-13211409'],
-            'attributes': ['non-existing-attribute']
-        }
-    )
-    assert response.status_code == 404
+    with pytest.raises(HTTPException):
+        get_issue_data(IssueDataIn(issue_ids=['Apache-13211409'], attributes=['summary']))
 
     restore_dbs()

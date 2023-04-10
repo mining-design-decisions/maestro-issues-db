@@ -18,7 +18,7 @@ def setup_db():
     })
 
 
-def test_add_tags():
+def test_add_tags_in_bulk():
     restore_dbs()
     setup_users_db()
     setup_db()

@@ -1,6 +1,6 @@
 from .test_util import client
 from .test_util import setup_users_db, restore_dbs, get_auth_header, auth_test_post, auth_test_delete
-from app.dependencies import tags_collection
+from app.dependencies import tags_collection, projects_collection
 
 
 def setup_db():
@@ -53,6 +53,18 @@ def test_create_tag():
         'description': 'text',
         'type': 'manual-tag'
     }
+
+    # Tag in projects collection
+    projects_collection.insert_one({
+        '_id': 'Apache-YARN',
+        'repo': 'Apache',
+        'project': 'YARN'
+    })
+    payload = {
+        'tag': 'Apache-YARN',
+        'description': 'text'
+    }
+    assert client.post('/tags', headers=headers, json=payload).status_code == 409
 
     restore_dbs()
 

@@ -14,6 +14,19 @@ router = APIRouter(
 )
 
 
+class EmbeddingOut(BaseModel):
+    embedding_id: str
+    config: dict
+
+
+class EmbeddingsOut(BaseModel):
+    embeddings: list[EmbeddingOut]
+
+
+class EmbeddingIdOut(BaseModel):
+    embedding_id: str
+
+
 class Config(BaseModel):
     config: dict
 
@@ -22,35 +35,34 @@ def _get_embedding(embedding_id: str, attributes: list[str]):
     try:
         embedding = embeddings_collection.find_one({'_id': ObjectId(embedding_id)}, attributes)
     except bson.errors.BSONError as e:
-        raise bson_exception(e)
+        raise bson_exception(str(e))
     if embedding is None:
         raise embedding_not_found_exception(embedding_id)
     return embedding
 
 
-@router.get('')
-def get_embeddings() -> dict[str, dict]:
+@router.get('', response_model=EmbeddingsOut)
+def get_all_embeddings():
     """
-    Get all embeddings and their config.
+    Get all embeddings and their configs.
     """
-    embeddings = embeddings_collection.find({}, ['config'])
-    response = {}
-    for embedding in embeddings:
-        response[str(embedding['_id'])] = embedding['config']
-    return response
+    embeddings = []
+    for embedding in embeddings_collection.find({}, ['config']):
+        embeddings.append(EmbeddingOut(embedding_id=str(embedding['_id']), config=embedding['config']))
+    return EmbeddingsOut(embeddings=embeddings)
 
 
-@router.post('')
-def create_embedding(request: Config, token=Depends(validate_token)) -> dict[str, str]:
+@router.post('', response_model=EmbeddingIdOut)
+def create_embedding(request: Config, token=Depends(validate_token)):
     """
-    Create a new embedding with the given config and the uploaded file.
+    Create a new embedding with the given config.
     """
     _id = embeddings_collection.insert_one({
         'config': request.config,
         'file_id': None
     }).inserted_id
     return {
-        'embedding-id': str(_id)
+        'embedding_id': str(_id)
     }
 
 
@@ -65,7 +77,7 @@ def update_embedding(embedding_id: str, request: Config, token=Depends(validate_
             {'$set': {'config': request.config}}
         )
     except bson.errors.BSONError as e:
-        raise bson_exception(e)
+        raise bson_exception(str(e))
     if result.matched_count == 0:
         raise embedding_not_found_exception(embedding_id)
 
@@ -82,7 +94,7 @@ def delete_embedding(embedding_id: str, token=Depends(validate_token)):
 
 
 @router.post('/{embedding_id}/file')
-def upload_file(embedding_id: str, file: UploadFile = Form(), token=Depends(validate_token)):
+def upload_embedding_file(embedding_id: str, file: UploadFile = Form(), token=Depends(validate_token)):
     """
     Upload embedding file for the given embedding.
     """
@@ -99,7 +111,7 @@ def upload_file(embedding_id: str, file: UploadFile = Form(), token=Depends(vali
 
 
 @router.get('/{embedding_id}/file')
-def get_file(embedding_id: str):
+def get_embedding_file(embedding_id: str):
     """
     Get the embedding file for the given embedding.
     """
@@ -112,7 +124,7 @@ def get_file(embedding_id: str):
 
 
 @router.delete('/{embedding_id}/file')
-def delete_file(embedding_id: str, token=Depends(validate_token)):
+def delete_embedding_file(embedding_id: str, token=Depends(validate_token)):
     """
     Delete embedding file for the given embedding.
     """

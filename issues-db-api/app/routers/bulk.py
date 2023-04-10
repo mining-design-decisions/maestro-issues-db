@@ -20,7 +20,7 @@ class AddTagsIn(BaseModel):
 
 
 @router.post('/add-tags')
-def add_tags(request: AddTagsIn, token=Depends(validate_token)):
+def add_tags_in_bulk(request: AddTagsIn, token=Depends(validate_token)):
     """
     Method for adding tags to issues in bulk. The tags and
     issue ids should be specified in the request body.

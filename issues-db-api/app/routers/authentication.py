@@ -84,6 +84,9 @@ def validate_token(token: str = Depends(oauth2_scheme)):
 
 @router.post('/token', response_model=Token)
 def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+    """
+    Provide your username and password as form data to get an access token.
+    """
     username = authenticate_user(form_data.username, form_data.password)
     if username is None:
         raise CREDENTIALS_EXCEPTION
@@ -93,6 +96,9 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
 
 @router.post('/create-account')
 def create_account(new_account: User, token=Depends(validate_token)):
+    """
+    Create a new account with the provided username and password.
+    """
     try:
         users_collection.insert_one({
             '_id': new_account.username,

@@ -8,6 +8,7 @@ else:
     mongo_client = MongoClient('mongodb://localhost:27017')
 
 jira_repos_db = mongo_client['JiraRepos']
+mining_add_db = mongo_client['MiningDesignDecisions']
 fs = gridfs.GridFS(mongo_client['MiningDesignDecisions'])
 
 manual_labels_collection = mongo_client['MiningDesignDecisions']['IssueLabels']

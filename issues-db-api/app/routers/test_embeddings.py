@@ -1,244 +1,204 @@
-from fastapi.testclient import TestClient
 from bson import ObjectId
 import io
 
-from app import app
-from app.dependencies import users_collection
-from app.routers.authentication import get_password_hash
-
-client = TestClient(app.app)
-
-
-def restore_db():
-    users_collection.delete_many({})
+from app.dependencies import embeddings_collection, fs
+from .test_util import client, restore_dbs, setup_users_db, get_auth_header, auth_test_post, auth_test_delete
 
 
 def setup_db():
-    restore_db()
-    users_collection.insert_one({
-        '_id': 'test',
-        'hashed_password': get_password_hash('test')
+    embeddings_collection.insert_one({
+        '_id': ObjectId()
     })
 
 
-def get_token():
-    response = client.post(
-        '/token',
-        files={
-            'username': (None, 'test'),
-            'password': (None, 'test')
-        }
-    )
-    return response.json()["access_token"]
+def test_get_all_embeddings():
+    restore_dbs()
 
-
-def create_embedding(token: str):
+    # Init db
+    embedding_id = ObjectId()
     config = {'key': 'value'}
-
-    # Test creating an embedding
-    response = client.post(
-        '/embeddings',
-        json={'config': config}
-    )
-    # Not authenticated
-    assert response.status_code == 401
-
-    response = client.post(
-        '/embeddings',
-        headers={'Authorization': f'bearer {token}'},
-        json={'config': config}
-    )
-    # Authenticated
-    assert response.status_code == 200
-    embedding_id = response.json()['embedding-id']
+    embeddings_collection.insert_one({
+        '_id': embedding_id,
+        'config': config,
+        'file_id': None
+    })
 
     # Get embeddings
-    response = client.get('/embeddings')
+    assert client.get('/embeddings').json() == {'embeddings': [{'embedding_id': str(embedding_id), 'config': config}]}
+
+    restore_dbs()
+
+
+def test_create_embedding():
+    restore_dbs()
+    setup_users_db()
+
+    auth_test_post('/embeddings')
+    headers = get_auth_header()
+
+    # Create embedding
+    config = {'key': 'value'}
+    response = client.post('/embeddings', headers=headers, json={'config': config})
     assert response.status_code == 200
-    # Make sure the embedding was inserted
-    assert response.json() == {embedding_id: config}
-    return embedding_id
+    assert embeddings_collection.find_one({'_id': ObjectId(response.json()['embedding_id'])}) == {
+        '_id': ObjectId(response.json()['embedding_id']),
+        'config': config,
+        'file_id': None
+    }
+
+    restore_dbs()
 
 
-def update_embedding(embedding_id: str, token: str):
-    new_config = {'new_key': 'new_value'}
-    # Test authentication
-    response = client.post(
-        f'/embeddings/{embedding_id}',
-        json={'config': new_config}
-    )
-    assert response.status_code == 401
+def test_update_embedding():
+    restore_dbs()
+    setup_users_db()
 
-    response = client.post(
-        f'/embeddings/{embedding_id}',
-        headers={'Authorization': f'bearer {token}'},
-        json={'config': new_config}
-    )
-    assert response.status_code == 200
+    embedding_id = ObjectId()
+    auth_test_post(f'/embeddings/{embedding_id}')
+    headers = get_auth_header()
 
-    # Make sure the config was updated
-    response = client.get('/embeddings')
-    assert response.json()[embedding_id] == new_config
+    # Init db
+    embeddings_collection.insert_one({
+        '_id': embedding_id,
+        'config': {'key': 'value'},
+        'file_id': None
+    })
 
-    # Restore original config
-    response = client.post(
-        f'/embeddings/{embedding_id}',
-        headers={'Authorization': f'bearer {token}'},
-        json={'config': {'key': 'value'}}
-    )
-    assert response.status_code == 200
+    # Update the embedding
+    new_config = {'new-key': 'new-value'}
+    assert client.post(f'/embeddings/{embedding_id}', headers=headers, json={'config': new_config}).status_code == 200
+    assert embeddings_collection.find_one({'_id': ObjectId(embedding_id)}) == {
+        '_id': ObjectId(embedding_id),
+        'config': new_config,
+        'file_id': None
+    }
 
-    # Test updating with illegal ObjectId
-    response = client.post(
-        f'/embeddings/non-existing-id',
-        headers={'Authorization': f'bearer {token}'},
-        json={'config': {'key': 'value'}}
-    )
-    assert response.status_code == 422
+    # Non-existing embedding
+    assert client.post(f'/embeddings/{ObjectId()}', headers=headers, json={'config': new_config}).status_code == 404
 
-    # Test updating non-existing embedding
-    new_id = ObjectId()
-    response = client.post(
-        f'/embeddings/{new_id}',
-        headers={'Authorization': f'bearer {token}'},
-        json={'config': {'key': 'value'}}
-    )
-    assert response.status_code == 404
+    # Illegal id
+    assert client.post('/embeddings/illegal-id', headers=headers, json={'config': new_config}).status_code == 422
+
+    restore_dbs()
 
 
-def upload_file(embedding_id: str, token: str):
+def test_delete_embedding():
+    restore_dbs()
+    setup_users_db()
+
+    embedding_id = ObjectId()
+    auth_test_delete(f'/embeddings/{embedding_id}')
+    headers = get_auth_header()
+
+    # Init db
     file = io.BytesIO(bytes('mock data', 'utf-8'))
-    response = client.post(
-        f'/embeddings/{embedding_id}/file',
-        files={
-            'file': ('filename', file)
-        }
-    )
-    # Not authenticated
-    assert response.status_code == 401
-
-    response = client.post(
-        f'/embeddings/{embedding_id}/file',
-        headers={'Authorization': f'bearer {token}'},
-        files={
-            'file': ('filename', file)
-        }
-    )
-    assert response.status_code == 200
-
-    response = client.get(
-        f'/embeddings/{embedding_id}/file'
-    )
-    assert response.status_code == 200
-    assert bytes('mock data', 'utf-8') == response.content
-
-    # Upload new file to test overwrite
-    file = io.BytesIO(bytes('mock data 2', 'utf-8'))
-    response = client.post(
-        f'/embeddings/{embedding_id}/file',
-        headers={'Authorization': f'bearer {token}'},
-        files={
-            'file': ('filename', file)
-        }
-    )
-    assert response.status_code == 200
-
-    response = client.get(
-        f'/embeddings/{embedding_id}/file'
-    )
-    assert response.status_code == 200
-    assert bytes('mock data 2', 'utf-8') == response.content
-
-
-def delete_file(embedding_id: str, token: str):
-    # Make sure the file exists
-    response = client.get(
-        f'/embeddings/{embedding_id}/file'
-    )
-    assert response.status_code == 200
-
-    # Test file deletion
-    response = client.delete(
-        f'/embeddings/{embedding_id}/file'
-    )
-    # Not authenticated
-    assert response.status_code == 401
-
-    response = client.delete(
-        f'/embeddings/{embedding_id}/file',
-        headers={'Authorization': f'bearer {token}'}
-    )
-    assert response.status_code == 200
-
-    # Make sure the file is deleted
-    response = client.get(
-        f'/embeddings/{embedding_id}/file'
-    )
-    assert response.status_code == 404
-
-    # Cannot delete a second time
-    response = client.delete(
-        f'/embeddings/{embedding_id}/file',
-        headers={'Authorization': f'bearer {token}'}
-    )
-    assert response.status_code == 404
-
-
-def delete_embedding(embedding_id: str, token: str):
-    # Make sure file exists and will be deleted
-    file = io.BytesIO(bytes('mock data', 'utf-8'))
-    response = client.post(
-        f'/embeddings/{embedding_id}/file',
-        headers={'Authorization': f'bearer {token}'},
-        files={
-            'file': ('filename', file)
-        }
-    )
-    assert response.status_code == 200
+    file_id = fs.put(file, filename='filename.txt')
+    embeddings_collection.insert_one({
+        '_id': embedding_id,
+        'config': {'key': 'value'},
+        'file_id': file_id
+    })
 
     # Delete embedding
-    response = client.delete(
-        f'/embeddings/{embedding_id}'
-    )
-    # Not authenticated
-    assert response.status_code == 401
+    assert client.delete(f'/embeddings/{embedding_id}', headers=headers).status_code == 200
+    assert embeddings_collection.find_one({'_id': embedding_id}) is None
+    assert fs.exists(file_id) is False
 
-    response = client.delete(
-        f'/embeddings/{embedding_id}',
-        headers={'Authorization': f'bearer {token}'}
-    )
-    # Authenticated
-    assert response.status_code == 200
+    # Delete non-existing embedding
+    assert client.delete(f'/embeddings/{embedding_id}', headers=headers).status_code == 404
 
-    # Get embeddings
-    response = client.get('/embeddings')
-    assert response.status_code == 200
-    # Make sure embedding is deleted
-    assert response.json() == {}
+    # Test illegal id
+    assert client.delete('/embeddings/illegal-id', headers=headers).status_code == 422
 
-    # Try to delete with illegal id
-    response = client.delete(
-        f'/embeddings/non-existing-id',
-        headers={'Authorization': f'bearer {token}'}
-    )
-    assert response.status_code == 422
-
-    # Try to delete non exsting id
-    response = client.delete(
-        f'/embeddings/{embedding_id}',
-        headers={'Authorization': f'bearer {token}'}
-    )
-    assert response.status_code == 404
+    restore_dbs()
 
 
-def test_embeddings_endpoints():
-    setup_db()
-    token = get_token()
+def test_upload_embedding_file():
+    restore_dbs()
+    setup_users_db()
 
-    embedding_id = create_embedding(token)
-    update_embedding(embedding_id, token)
-    upload_file(embedding_id, token)
-    delete_file(embedding_id, token)
-    delete_embedding(embedding_id, token)
+    embedding_id = ObjectId()
+    auth_test_post(f'/embeddings/{embedding_id}/file')
+    headers = get_auth_header()
 
-    restore_db()
+    # Init db
+    embeddings_collection.insert_one({
+        '_id': embedding_id,
+        'config': {'key': 'value'},
+        'file_id': None
+    })
+
+    # Upload file
+    file = io.BytesIO(bytes('mock data', 'utf-8'))
+    assert client.post(f'/embeddings/{embedding_id}/file', headers=headers, files={
+        'file': ('filename', file)
+    }).status_code == 200
+    file_id = ObjectId(embeddings_collection.find_one({'_id': embedding_id})['file_id'])
+    assert fs.get(file_id).read() == bytes('mock data', 'utf-8')
+
+    # Upload new file to test overwrite
+    new_file = io.BytesIO(bytes('new mock data', 'utf-8'))
+    assert client.post(f'/embeddings/{embedding_id}/file', headers=headers, files={
+        'file': ('filename', new_file)
+    }).status_code == 200
+    new_file_id = ObjectId(embeddings_collection.find_one({'_id': embedding_id})['file_id'])
+    assert fs.get(new_file_id).read() == bytes('new mock data', 'utf-8')
+
+    # Make sure the previous one is deleted
+    assert fs.exists(file_id) is False
+
+    restore_dbs()
+
+
+def test_get_embedding_file():
+    restore_dbs()
+
+    # Init db
+    embedding_id = ObjectId()
+    file = io.BytesIO(bytes('mock data', 'utf-8'))
+    file_id = fs.put(file, filename='filename.txt')
+    embeddings_collection.insert_one({
+        '_id': embedding_id,
+        'config': {'key': 'value'},
+        'file_id': file_id
+    })
+
+    # Get embedding
+    assert client.get(f'/embeddings/{embedding_id}/file').content == bytes('mock data', 'utf-8')
+
+    # Get non-existing embedding
+    assert client.get(f'/embeddings/{ObjectId()}/file').status_code == 404
+
+    # Get non-existing embedding file
+    embeddings_collection.update_one({'_id': embedding_id}, {'$set': {'file_id': None}})
+    assert client.get(f'/embeddings/{embedding_id}/file').status_code == 404
+
+    restore_dbs()
+
+
+def test_delete_embedding_file():
+    restore_dbs()
+    setup_users_db()
+
+    embedding_id = ObjectId()
+    auth_test_delete(f'/embeddings/{embedding_id}/file')
+    headers = get_auth_header()
+
+    # Init db
+    embedding_id = ObjectId()
+    file = io.BytesIO(bytes('mock data', 'utf-8'))
+    file_id = fs.put(file, filename='filename.txt')
+    embeddings_collection.insert_one({
+        '_id': embedding_id,
+        'config': {'key': 'value'},
+        'file_id': file_id
+    })
+
+    # Delete file
+    assert client.delete(f'/embeddings/{embedding_id}/file', headers=headers).status_code == 200
+    assert fs.exists(file_id) is False
+
+    # Delete non-existing file
+    assert client.delete(f'/embeddings/{embedding_id}/file', headers=headers).status_code == 404
+
+    restore_dbs()
