@@ -29,19 +29,13 @@ def test_issue_data_endpoint():
     setup_db()
 
     assert get_issue_data(IssueDataIn(issue_ids=['Apache-13211409'], attributes=['key', 'link', 'summary'])) == {
-        'data': [{
-            'issue_id': 'Apache-13211409',
-            'attributes': [{
-                'name': 'key',
-                'value': 'YARN-9230'
-            }, {
-                'name': 'link',
-                'value': 'https://issues.apache.org/jira/browse/YARN-9230'
-            }, {
-                'name': 'summary',
-                'value': 'Write a go hdfs driver for Docker Registry'
-            }]
-        }]
+        'data': {
+            'Apache-13211409': {
+                'key': 'YARN-9230',
+                'link': 'https://issues.apache.org/jira/browse/YARN-9230',
+                'summary': 'Write a go hdfs driver for Docker Registry'
+            }
+        }
     }
 
     # Test attribute not found
@@ -50,13 +44,11 @@ def test_issue_data_endpoint():
 
     # Test parent attribute
     assert get_issue_data(IssueDataIn(issue_ids=['Apache-13211409'], attributes=['parent'])) == {
-        'data': [{
-            'issue_id': 'Apache-13211409',
-            'attributes': [{
-                'name': 'parent',
-                'value': None
-            }]
-        }]
+        'data': {
+            'Apache-13211409': {
+                'parent': None,
+            }
+        }
     }
 
     # Test non-existing issue
@@ -77,13 +69,11 @@ def test_issue_data_endpoint():
 
     # Test default value
     assert get_issue_data(IssueDataIn(issue_ids=['Apache-13211410'], attributes=['summary'])) == {
-        'data': [{
-            'issue_id': 'Apache-13211410',
-            'attributes': [{
-                'name': 'summary',
-                'value': ''
-            }]
-        }]
+        'data': {
+            'Apache-13211410': {
+                'summary': ''
+            }
+        }
     }
 
     # Test required attribute

@@ -24,14 +24,13 @@ def test_get_manual_labels():
 
     # Get label
     assert get_manual_labels(ManualLabelsIn(issue_ids=['Apache-01'])) == {
-        'manual_labels': [{
-            'issue_id': 'Apache-01',
-            'manual_label': {
+        'manual_labels': {
+            'Apache-01': {
                 'existence': False,
                 'property': False,
                 'executive': True
             }
-        }]
+        }
     }
 
     # Get label of non-existing issue
@@ -81,11 +80,12 @@ def test_get_comments():
 
     # Get comments
     assert client.get('/manual-labels/Apache-01/comments').json() == {
-        'comments': [{
-            'comment_id': str(comment_id),
-            'author': 'test',
-            'comment': 'text'
-        }]
+        'comments': {
+            str(comment_id): {
+                'author': 'test',
+                'comment': 'text'
+            }
+        }
     }
 
     # Non-existing issue
@@ -93,7 +93,7 @@ def test_get_comments():
 
     # No comments
     manual_labels_collection.insert_one({'_id': 'Apache-02'})
-    assert client.get('/manual-labels/Apache-02/comments').json() == {'comments': []}
+    assert client.get('/manual-labels/Apache-02/comments').json() == {'comments': {}}
 
     restore_dbs()
 

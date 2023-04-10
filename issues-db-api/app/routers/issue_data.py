@@ -31,22 +31,23 @@ class IssueDataIn(BaseModel):
     attributes: list[str]
 
 
-class AttributeOut(BaseModel):
-    name: str
-    value: typing.Any
-
-
-class IssueOut(BaseModel):
-    issue_id: str
-    attributes: list[AttributeOut]
-
-
 class IssueDataOut(BaseModel):
-    data: list[IssueOut]
+    data: dict[str, dict[str, typing.Any]]
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "data": {
+                    "issue_id": {
+                        "attribute_name": "attribute_value (can be any type)"
+                    }
+                }
+            }
+        }
 
 
-@router.post('')
-def get_issue_data(request: IssueDataIn) -> IssueDataOut:
+@router.post('', response_model=IssueDataOut)
+def get_issue_data(request: IssueDataIn):
     """
     Returns issue data. The returned data is determined by the
     specified issue ids and the attributes that are requested.
@@ -60,7 +61,7 @@ def get_issue_data(request: IssueDataIn) -> IssueDataOut:
         # First part is the jira repo name, second part is the id
         ids[split_id[0]].append(split_id[1])
 
-    data = []
+    data = {}
     for jira_name in jira_repos_db.list_collection_names():
         issue_link_prefix = issue_links_collection.find_one({'_id': jira_name})['link']
         issues = jira_repos_db[jira_name].find(
@@ -73,17 +74,17 @@ def get_issue_data(request: IssueDataIn) -> IssueDataOut:
             if issue['id'] not in remaining_ids:
                 raise duplicate_issue_exception(jira_name, issue['id'])
             remaining_ids.remove(issue['id'])
-            attributes = []
+            attributes = {}
             for attr in request.attributes:
                 if attr == 'key':
                     if issue[attr] is None:
                         raise get_attr_required_exception(attr, f'{jira_name}-{issue["id"]}')
-                    attributes.append(AttributeOut(name=attr, value=issue[attr]))
+                    attributes[attr] = issue[attr]
                 elif attr == 'link':
-                    attributes.append(AttributeOut(name=attr, value=f'{issue_link_prefix}/browse/{issue["key"]}'))
+                    attributes[attr] = f'{issue_link_prefix}/browse/{issue["key"]}'
                 elif attr not in issue['fields']:
                     if attr == 'parent':
-                        attributes.append(AttributeOut(name=attr, value=None))
+                        attributes[attr] = None
                     else:
                         raise attribute_not_found_exception(attr, jira_name, issue['id'])
                 elif issue['fields'][attr] is not None:
@@ -95,23 +96,23 @@ def get_issue_data(request: IssueDataIn) -> IssueDataOut:
                                 issuelinks[idx]['outwardIssue'] = f'{jira_name}-{issuelinks[idx]["outwardIssue"]["id"]}'
                             if 'inwardIssue' in issuelinks[idx]:
                                 issuelinks[idx]['inwardIssue'] = f'{jira_name}-{issuelinks[idx]["inwardIssue"]["id"]}'
-                        attributes.append(AttributeOut(name=attr, value=issuelinks))
+                        attributes[attr] = issuelinks
                     elif attr == 'parent':
-                        attributes.append(AttributeOut(name=attr, value=f'{jira_name}-{issue["fields"][attr]["id"]}'))
+                        attributes[attr] = f'{jira_name}-{issue["fields"][attr]["id"]}'
                     elif attr == 'subtasks':
                         subtasks = []
                         for subtask in issue['fields'][attr]:
                             subtasks.append(f'{jira_name}-{subtask["id"]}')
-                        attributes.append(AttributeOut(name=attr, value=subtasks))
+                        attributes[attr] = subtasks
                     else:
-                        attributes.append(AttributeOut(name=attr, value=issue['fields'][attr]))
+                        attributes[attr] = issue['fields'][attr]
                 elif attr not in list(default_value.keys()):
                     # Attribute does not exist, but is required
                     raise get_attr_required_exception(attr, f'{jira_name}-{issue["id"]}')
                 else:
                     # Use default value for attribute
-                    attributes.append(AttributeOut(name=attr, value=default_value[attr]))
-            data.append(IssueOut(issue_id=f'{jira_name}-{issue["id"]}', attributes=attributes))
+                    attributes[attr] = default_value[attr]
+            data[f'{jira_name}-{issue["id"]}'] = attributes
         if remaining_ids:
             raise issues_not_found_exception([f'{jira_name}-{id_}' for id_ in remaining_ids])
     return IssueDataOut(data=data)

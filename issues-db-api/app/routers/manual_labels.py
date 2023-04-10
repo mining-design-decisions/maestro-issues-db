@@ -24,27 +24,41 @@ class Label(typing.TypedDict):
     executive: bool | None
 
 
-class ManualLabelOut(BaseModel):
-    issue_id: str
-    manual_label: Label
-
-
 class ManualLabelsOut(BaseModel):
-    manual_labels: list[ManualLabelOut]
+    manual_labels: dict[str, Label]
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "manual_labels": {
+                    "issue_id": {
+                        "existence": True,
+                        "property": True,
+                        "executive": True
+                    }
+                }
+            }
+        }
 
 
 class CommentIn(BaseModel):
     comment: str
 
 
-class CommentOut(BaseModel):
-    comment_id: str
-    author: str
-    comment: str
-
-
 class CommentsOut(BaseModel):
-    comments: list[CommentOut]
+    comments: dict[str, dict[str, str]]
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "comments": {
+                    "comment_id": {
+                        "author": "username",
+                        "comment": "string"
+                    }
+                }
+            }
+        }
 
 
 class CommentIdOut(BaseModel):
@@ -87,18 +101,15 @@ def get_manual_labels(request: ManualLabelsIn):
     )
 
     # Build and send response
-    labels = []
+    labels = {}
     ids = set(request.issue_ids)
     for issue in issues:
         ids.remove(issue['_id'])
-        labels.append({
-            'issue_id': issue['_id'],
-            'manual_label': {
-                'existence': issue['existence'],
-                'property': issue['property'],
-                'executive': issue['executive']
-            }
-        })
+        labels[issue['_id']] = {
+            'existence': issue['existence'],
+            'property': issue['property'],
+            'executive': issue['executive']
+        }
     if ids:
         raise manual_labels_not_found_exception(list(ids))
     return ManualLabelsOut(manual_labels=labels)
@@ -132,14 +143,13 @@ def get_comments(issue_id: str):
     if issue is None:
         raise issue_not_found_exception(issue_id)
     if 'comments' not in issue or issue['comments'] is None:
-        return CommentsOut(comments=[])
-    comments = []
+        return CommentsOut(comments={})
+    comments = {}
     for comment_id in issue['comments']:
-        comments.append(CommentOut(
-            comment_id=str(comment_id),
-            author=issue['comments'][comment_id]['author'],
-            comment=issue['comments'][comment_id]['comment']
-        ))
+        comments[str(comment_id)] = {
+            'author': issue['comments'][comment_id]['author'],
+            'comment': issue['comments'][comment_id]['comment']
+        }
     return CommentsOut(comments=comments)
 
 
