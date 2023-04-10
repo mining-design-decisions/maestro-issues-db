@@ -20,13 +20,13 @@ def setup_users_db():
 
 
 def restore_dbs():
-    users_collection.delete_many({})
-    manual_labels_collection.delete_many({})
-    model_collection.delete_many({})
-    jira_repos_db['Apache'].delete_many({})
-    issue_links_collection.delete_many({})
-    projects_collection.delete_many({})
-    tags_collection.delete_many({})
+    users_collection.drop()
+    manual_labels_collection.drop()
+    model_collection.drop()
+    jira_repos_db['Apache'].drop()
+    issue_links_collection.drop()
+    projects_collection.drop()
+    tags_collection.drop()
     mining_add_db['fs_file'].drop()
     mining_add_db['fs_chunks'].drop()
     embeddings_collection.drop()

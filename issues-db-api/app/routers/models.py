@@ -13,73 +13,55 @@ router = APIRouter(
     prefix='/models',
     tags=['models']
 )
-example_request = {
-    "example": {
-        'model': 'MODEL-1',
-        'predictions': {
-            'ISSUE-ID-1': {
-                "existence": {
-                    "prediction": True,
-                    "confidence": 0.42
-                },
-                "property": {
-                    "prediction": False,
-                    "confidence": 0.42
-                },
-                "executive": {
-                    "prediction": False,
-                    "confidence": 0.42
-                }
-            },
-            'ISSUE-ID-2': {
-                "existence": {
-                    "prediction": False,
-                    "confidence": 0.42
-                },
-                "property": {
-                    "prediction": True,
-                    "confidence": 0.42
-                },
-                "executive": {
-                    "prediction": False,
-                    "confidence": 0.42
-                }
-            },
-        }
-    }
-}
 
 
 class SavePredictionsIn(BaseModel):
-    model: str
+    model_id: str
     predictions: dict[str, dict[str, dict[str, typing.Any]]]
 
     class Config:
-        schema_extra = example_request
+        schema_extra = {
+            "example": {
+                'model_id': 'model_id',
+                'predictions': {
+                    'issue_id': {
+                        "existence": {
+                            "prediction": True,
+                            "confidence": 0.42
+                        }
+                    }
+                }
+            }
+        }
 
 
 class PostModelIn(BaseModel):
-    config: dict
-    name: typing.Optional[str]
+    model_config: dict
+    model_name: typing.Optional[str]
 
 
 class PostModelOut(BaseModel):
-    id: str
+    model_id: str
 
 
 class GetModelOut(BaseModel):
-    id: str
-    name: typing.Optional[str]
-    config: dict
+    model_id: str
+    model_name: typing.Optional[str]
+    model_config: dict
 
 
 class UpdateModelIn(BaseModel):
-    name: typing.Optional[str]
-    config: typing.Optional[dict]
+    model_name: typing.Optional[str]
+    model_config: typing.Optional[dict]
+
+
+class SimpleModelOut(BaseModel):
+    model_id: str
+    model_name: str
 
 
 class GetModelsOut(BaseModel):
-    models: list[dict[str, typing.Any]]
+    models: list[SimpleModelOut]
 
 
 class PostPerformanceIn(BaseModel):
@@ -87,16 +69,69 @@ class PostPerformanceIn(BaseModel):
     performance: list
 
 
+class PerformancesOut(BaseModel):
+    performances: list[str]
+
+    class Config:
+        schema_extra = {
+            "example": {
+                'performances': ['performance_time']
+            }
+        }
+
+
+class PerformanceOut(BaseModel):
+    performance_time: str
+    performance: dict
+
+
 class PostPredictionsIn(BaseModel):
     predictions: dict[str, dict[str, dict[str, typing.Any]]]
 
+    class Config:
+        schema_extra = {
+            "example": {
+                'predictions': {
+                    'issue_id': {
+                        "existence": {
+                            "prediction": True,
+                            "confidence": 0.42
+                        }
+                    }
+                }
+            }
+        }
+
 
 class GetPredictionsIn(BaseModel):
-    ids: list[str] | None
+    issue_ids: list[str] | None
 
 
 class GetPredictionsOut(BaseModel):
     predictions: dict[str, dict[str, dict[str, typing.Any]] | None]
+
+    class Config:
+        schema_extra = {
+            "example": {
+                'predictions': {
+                    'issue_id': {
+                        "existence": {
+                            "prediction": True,
+                            "confidence": 0.42
+                        }
+                    }
+                }
+            }
+        }
+
+
+class VersionOut(BaseModel):
+    version_id: str
+    time: str
+
+
+class VersionsOut(BaseModel):
+    versions: list[VersionOut]
 
 
 def _get_model(model_id: str, attributes: list[str]):
@@ -142,45 +177,42 @@ def _delete_version(model_id: str, version_id: ObjectId):
     _delete_predictions(model_id, version_id)
 
 
-@router.post('')
-def create_model(request: PostModelIn, token=Depends(validate_token)) -> PostModelOut:
-    """
-    Creates a new model entry with the given config.
-    """
-    _id = model_collection.insert_one({
-        'name': '' if request.name is None else request.name,
-        'config': request.config,
-        'versions': [],
-        'performances': {}
-    }).inserted_id
-    return PostModelOut(id=str(_id))
-
-
-@router.get('')
-def get_models():
+@router.get('', response_model=GetModelsOut)
+def get_all_models():
     """
     Returns a list of all models in the database.
     """
     models = model_collection.find({}, ['name'])
     response = []
     for model in models:
-        response.append({
-            'id': str(model['_id']),
-            'name': model['name']
-        })
+        response.append(SimpleModelOut(model_id=str(model['_id']), model_name=model['name']))
     return GetModelsOut(models=response)
 
 
-@router.get('/{model_id}')
-def get_model(model_id: str) -> GetModelOut:
+@router.post('', response_model=PostModelOut)
+def create_model(request: PostModelIn, token=Depends(validate_token)):
+    """
+    Creates a new model entry with the given config.
+    """
+    _id = model_collection.insert_one({
+        'name': '' if request.model_name is None else request.model_name,
+        'config': request.model_config,
+        'versions': [],
+        'performances': {}
+    }).inserted_id
+    return PostModelOut(model_id=str(_id))
+
+
+@router.get('/{model_id}', response_model=GetModelOut)
+def get_model(model_id: str):
     """
     Return the model with the specified model id.
     """
     model = _get_model(model_id, ['name', 'config'])
     return GetModelOut(
-        id=model_id,
-        name=model['name'],
-        config=model['config']
+        model_id=model_id,
+        model_name=model['name'],
+        model_config=model['config']
     )
 
 
@@ -190,10 +222,10 @@ def update_model(model_id: str, request: UpdateModelIn, token=Depends(validate_t
     Update the name and/or config of the model with model_id.
     """
     updated_info = dict()
-    if request.name is not None:
-        updated_info['name'] = request.name
-    if request.config is not None:
-        updated_info['config'] = request.config
+    if request.model_name is not None:
+        updated_info['name'] = request.model_name
+    if request.model_config is not None:
+        updated_info['config'] = request.model_config
     _update_model(model_id, {'$set': updated_info})
 
 
@@ -208,7 +240,7 @@ def delete_model(model_id: str, token=Depends(validate_token)):
         _delete_version(model_id, version['id'])
 
     # Delete the model itself, including performances
-    model_collection.delete_one({'_id': model_id})
+    model_collection.delete_one({'_id': ObjectId(model_id)})
 
 
 @router.post('/{model_id}/versions')
@@ -229,11 +261,11 @@ def create_model_version(
         }
     }})
     return {
-        'version-id': str(version_id)
+        'version_id': str(version_id)
     }
 
 
-@router.get('/{model_id}/versions')
+@router.get('/{model_id}/versions', response_model=VersionsOut)
 def get_model_versions(model_id: str):
     """
     Get the model versions for the specified model.
@@ -241,17 +273,14 @@ def get_model_versions(model_id: str):
     model = _get_model(model_id, ['versions'])
     versions = []
     for version in model['versions']:
-        versions.append({
-            'id': str(version['id']),
-            'time': version['time'].replace('_', '.')
-        })
-    return {'versions': versions}
+        versions.append(VersionOut(version_id=str(version['id']), time=version['time'].replace('_', '.')))
+    return VersionsOut(versions=versions)
 
 
 @router.get('/{model_id}/versions/{version_id}')
 def get_model_version(model_id: str, version_id: str):
     """
-    Get the requested version for the given model.
+    Get the binary file for the given model version.
     """
     model = _get_model(model_id, ['versions'])
     for version in model['versions']:
@@ -263,11 +292,14 @@ def get_model_version(model_id: str, version_id: str):
 
 
 @router.delete('/{model_id}/versions/{version_id}')
-def delete_version(model_id: str, version_id: str, token=Depends(validate_token)):
+def delete_model_version(model_id: str, version_id: str, token=Depends(validate_token)):
     model = _get_model(model_id, ['versions'])
-    for version in model['versions']:
+    for idx in range(len(model['versions'])):
+        version = model['versions'][idx]
         if version_id == str(version['id']):
             _delete_version(model_id, version['id'])
+            model_collection.update_one({'_id': ObjectId(model_id)}, {'$unset': {f'versions.{idx}': ''}})
+            model_collection.update_one({'_id': ObjectId(model_id)}, {'$pull': {f'versions': None}})
             return
     raise version_not_found_exception(version_id, model_id)
 
@@ -306,28 +338,28 @@ def post_predictions(
         manual_labels_collection.create_index(f'predictions.{model_id}-{version_id}.{class_}.confidence')
 
 
-@router.get('/{model_id}/versions/{version_id}/predictions')
+@router.get('/{model_id}/versions/{version_id}/predictions', response_model=GetPredictionsOut)
 def get_predictions(model_id: str, version_id: str, request: GetPredictionsIn):
     """
     Returns the predicted labels of the specified model version.
     """
-    if request.ids is None:
+    if request.issue_ids is None:
         filter_ = {f'predictions.{model_id}-{version_id}': {'$exists': True}}
     else:
         filter_ = {'$and': [
-            {'_id': {'$in': request.ids}},
+            {'_id': {'$in': request.issue_ids}},
             {f'predictions.{model_id}-{version_id}': {'$exists': True}}
         ]}
     issues = manual_labels_collection.find(filter_, [f'predictions.{model_id}-{version_id}'])
     predictions = dict()
-    if request.ids is not None:
-        remaining_ids = set(request.ids)
+    if request.issue_ids is not None:
+        remaining_ids = set(request.issue_ids)
     for issue in issues:
         issue_id = issue.pop('_id')
         predictions[issue_id] = issue['predictions'][f'{model_id}-{version_id}']
-        if request.ids is not None:
+        if request.issue_ids is not None:
             remaining_ids.remove(issue_id)
-    if request.ids is not None:
+    if request.issue_ids is not None:
         for issue_id in remaining_ids:
             predictions[issue_id] = None
     return GetPredictionsOut(predictions=predictions)
@@ -357,14 +389,14 @@ def post_performance(
     }})
 
 
-@router.get('/{model_id}/performances')
+@router.get('/{model_id}/performances', response_model=PerformancesOut)
 def get_performances(model_id: str):
     """
     Get a list of all performance results for the given model.
     """
     model = _get_model(model_id, ['performances'])
     performances = [performance.replace("_", ".") for performance in model['performances']]
-    return {'performances': performances}
+    return PerformancesOut(performances=performances)
 
 
 @router.get('/{model_id}/performances/{performance_time}')
@@ -373,7 +405,10 @@ def get_performance(model_id: str, performance_time: str):
     Get the requested performance result.
     """
     model = _get_model(model_id, ['performances'])
-    return {performance_time.replace("_", "."): model['performances'][performance_time.replace(".", "_")]}
+    return PerformanceOut(
+        performance_time=performance_time.replace("_", "."),
+        performance=model['performances'][performance_time.replace(".", "_")]
+    )
 
 
 @router.delete('/{model_id}/performances/{performance_time}')
