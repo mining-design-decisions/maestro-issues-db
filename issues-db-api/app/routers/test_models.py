@@ -32,6 +32,7 @@ def setup_db():
             }
         }
     })
+    manual_labels_collection.create_index(f'predictions.{model_id}-{version_id}.existence.confidence')
 
     return model_id, version_id, time
 
@@ -236,10 +237,24 @@ def test_post_predictions():
             }
         }
     }
-    assert len(manual_labels_collection.index_information()) == 2
+    assert len(manual_labels_collection.index_information()) == 3
 
     # Non-existing version
     response = client.post(f'/models/{model_id}/versions/{ObjectId()}/predictions', headers=headers, json=payload)
+    assert response.status_code == 404
+
+    # Non-existing issue
+    payload = {
+        'predictions': {
+            'Non-existing-id': {
+                'property': {
+                    'confidence': 0.42,
+                    'prediction': False
+                }
+            }
+        }
+    }
+    response = client.post(f'/models/{model_id}/versions/{version_id}/predictions', headers=headers, json=payload)
     assert response.status_code == 404
 
     restore_dbs()
@@ -341,5 +356,8 @@ def test_delete_performance():
 
     # Non-existing model
     assert client.delete(f'/models/{ObjectId()}/performances/{time}', headers=headers).status_code == 404
+
+    # Non-existing performance
+    assert client.delete(f'/models/{model_id}/performances/non-existing', headers=headers).status_code == 404
 
     restore_dbs()

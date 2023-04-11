@@ -5,12 +5,6 @@ from app.dependencies import embeddings_collection, fs
 from .test_util import client, restore_dbs, setup_users_db, get_auth_header, auth_test_post, auth_test_delete
 
 
-def setup_db():
-    embeddings_collection.insert_one({
-        '_id': ObjectId()
-    })
-
-
 def test_get_all_embeddings():
     restore_dbs()
 

@@ -7,26 +7,25 @@ router = APIRouter(
     prefix='/issue-ids',
     tags=['issue-ids']
 )
-example_request = {
-    "example": {
-        "filter": {
-            "$and": [
-                {"tags": {"$eq": "tag1"}},
-                {"$or": [
-                    {"tags": {"$ne": "tag2"}},
-                    {"tags": {"$eq": "tag3"}}
-                ]}
-            ]
-        }
-    }
-}
 
 
 class IssueIdsIn(BaseModel):
     filter: dict
 
     class Config:
-        schema_extra = example_request
+        schema_extra = {
+            "example": {
+                "filter": {
+                    "$and": [
+                        {"tags": {"$eq": "tag1"}},
+                        {"$or": [
+                            {"tags": {"$ne": "tag2"}},
+                            {"tags": {"$eq": "tag3"}}
+                        ]}
+                    ]
+                }
+            }
+        }
 
 
 class IssueIdsOut(BaseModel):
