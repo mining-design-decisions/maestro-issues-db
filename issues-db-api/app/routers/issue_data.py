@@ -46,7 +46,7 @@ class IssueDataOut(BaseModel):
         }
 
 
-@router.post('', response_model=IssueDataOut)
+@router.get('', response_model=IssueDataOut)
 def get_issue_data(request: IssueDataIn):
     """
     Returns issue data. The returned data is determined by the

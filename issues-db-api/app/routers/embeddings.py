@@ -16,6 +16,7 @@ router = APIRouter(
 
 class EmbeddingOut(BaseModel):
     embedding_id: str
+    name: str
     config: dict
 
 
@@ -27,7 +28,8 @@ class EmbeddingIdOut(BaseModel):
     embedding_id: str
 
 
-class Config(BaseModel):
+class UpdateEmbedding(BaseModel):
+    name: str
     config: dict
 
 
@@ -47,18 +49,23 @@ def get_all_embeddings():
     Get all embeddings and their configs.
     """
     embeddings = []
-    for embedding in embeddings_collection.find({}, ['config']):
-        embeddings.append(EmbeddingOut(embedding_id=str(embedding['_id']), config=embedding['config']))
+    for embedding in embeddings_collection.find({}):
+        embeddings.append(EmbeddingOut(
+            embedding_id=str(embedding['_id']),
+            name=embedding['name'],
+            config=embedding['config']
+        ))
     return EmbeddingsOut(embeddings=embeddings)
 
 
 @router.post('', response_model=EmbeddingIdOut)
-def create_embedding(request: Config, token=Depends(validate_token)):
+def create_embedding(request: UpdateEmbedding, token=Depends(validate_token)):
     """
     Create a new embedding with the given config.
     """
     _id = embeddings_collection.insert_one({
         'config': request.config,
+        'name': request.name,
         'file_id': None
     }).inserted_id
     return {
@@ -67,14 +74,14 @@ def create_embedding(request: Config, token=Depends(validate_token)):
 
 
 @router.post('/{embedding_id}')
-def update_embedding(embedding_id: str, request: Config, token=Depends(validate_token)):
+def update_embedding(embedding_id: str, request: UpdateEmbedding, token=Depends(validate_token)):
     """
     Update the config of the given embedding.
     """
     try:
         result = embeddings_collection.update_one(
             {'_id': ObjectId(embedding_id)},
-            {'$set': {'config': request.config}}
+            {'$set': {'name': request.name, 'config': request.config}}
         )
     except bson.errors.BSONError as e:
         raise bson_exception(str(e))

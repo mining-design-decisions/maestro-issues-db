@@ -1,5 +1,5 @@
 from .test_util import client
-from app.dependencies import manual_labels_collection
+from app.dependencies import issue_labels_collection
 from .test_util import setup_users_db, restore_dbs, get_auth_header, auth_test_post, auth_test_patch, auth_test_delete,\
     get_auth_header_other_user
 from .manual_labels import get_manual_labels, ManualLabelsIn
@@ -9,7 +9,7 @@ from fastapi import HTTPException
 
 
 def setup_db():
-    manual_labels_collection.insert_one({
+    issue_labels_collection.insert_one({
         '_id': 'Apache-01',
         'existence': False,
         'property': False,
@@ -51,7 +51,7 @@ def test_update_manual_label():
     # Update manual label
     payload = {'existence': True, 'property': True, 'executive': False}
     assert client.post('/manual-labels/Apache-01', headers=headers, json=payload).status_code == 200
-    assert manual_labels_collection.find_one({'_id': 'Apache-01'}) == {
+    assert issue_labels_collection.find_one({'_id': 'Apache-01'}) == {
         '_id': 'Apache-01',
         'existence': True,
         'property': True,
@@ -68,7 +68,7 @@ def test_update_manual_label():
 def test_get_comments():
     restore_dbs()
     comment_id = ObjectId()
-    manual_labels_collection.insert_one({
+    issue_labels_collection.insert_one({
         '_id': 'Apache-01',
         'comments': {
             str(comment_id): {
@@ -92,7 +92,7 @@ def test_get_comments():
     assert client.get('/manual-labels/Apache-02/comments').status_code == 404
 
     # No comments
-    manual_labels_collection.insert_one({'_id': 'Apache-02'})
+    issue_labels_collection.insert_one({'_id': 'Apache-02'})
     assert client.get('/manual-labels/Apache-02/comments').json() == {'comments': {}}
 
     restore_dbs()
@@ -109,7 +109,7 @@ def test_add_comment():
     # Add comment
     payload = {'comment': 'text'}
     comment_id = client.post('/manual-labels/Apache-01/comments', headers=headers, json=payload).json()['comment_id']
-    assert manual_labels_collection.find_one({'_id': 'Apache-01'}, ['comments', 'tags']) == {
+    assert issue_labels_collection.find_one({'_id': 'Apache-01'}, ['comments', 'tags']) == {
         '_id': 'Apache-01',
         'comments': {
             comment_id: {
@@ -130,7 +130,7 @@ def test_update_comment():
     restore_dbs()
     setup_users_db()
     comment_id = ObjectId()
-    manual_labels_collection.insert_one({
+    issue_labels_collection.insert_one({
         '_id': 'Apache-01',
         'comments': {
             str(comment_id): {
@@ -147,7 +147,7 @@ def test_update_comment():
     payload = {'comment': 'new-text'}
     response = client.patch(f'/manual-labels/Apache-01/comments/{comment_id}', headers=headers, json=payload)
     assert response.status_code == 200
-    assert manual_labels_collection.find_one({'_id': 'Apache-01'}, ['comments', 'tags']) == {
+    assert issue_labels_collection.find_one({'_id': 'Apache-01'}, ['comments', 'tags']) == {
         '_id': 'Apache-01',
         'comments': {
             str(comment_id): {
@@ -177,7 +177,7 @@ def test_delete_comment():
     restore_dbs()
     setup_users_db()
     comment_id = ObjectId()
-    manual_labels_collection.insert_one({
+    issue_labels_collection.insert_one({
         '_id': 'Apache-01',
         'comments': {
             str(comment_id): {
@@ -193,11 +193,11 @@ def test_delete_comment():
     # Delete comment of other user
     other_headers = get_auth_header_other_user()
     assert client.delete(f'/manual-labels/Apache-01/comments/{comment_id}', headers=other_headers).status_code == 403
-    assert manual_labels_collection.find_one({f'comments.{str(comment_id)}': {'$exists': True}}) is not None
+    assert issue_labels_collection.find_one({f'comments.{str(comment_id)}': {'$exists': True}}) is not None
 
     # Delete comment
     assert client.delete(f'/manual-labels/Apache-01/comments/{comment_id}', headers=headers).status_code == 200
-    assert manual_labels_collection.find_one({f'comments.{str(comment_id)}': {'$exists': True}}) is None
+    assert issue_labels_collection.find_one({f'comments.{str(comment_id)}': {'$exists': True}}) is None
 
     # Delete non-existing comment
     assert client.delete(f'/manual-labels/Apache-01/comments/{comment_id}', headers=headers).status_code == 404

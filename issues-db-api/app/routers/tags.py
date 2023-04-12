@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from app.dependencies import tags_collection, projects_collection
+from app.dependencies import tags_collection, projects_collection, issue_labels_collection
 from app.routers.authentication import validate_token
 from pymongo.errors import DuplicateKeyError
 from app.exceptions import tag_exists_exception, tag_not_found_exception
@@ -50,6 +50,13 @@ def get_tags():
             name=tag['_id'],
             description=tag['description'],
             type=tag['type']
+        ))
+    projects = projects_collection.find({})
+    for project in projects:
+        response.append(DbTag(
+            name=project['_id'],
+            description='',
+            type='project'
         ))
     return TagsOut(tags=response)
 
@@ -104,3 +111,4 @@ def delete_tag(tag: str, token=Depends(validate_token)):
     result = tags_collection.delete_one({'_id': tag})
     if result.deleted_count != 1:
         raise tag_not_found_exception(tag)
+    issue_labels_collection.update_many({'tags': tag}, {'$pull': {'tags': tag}})

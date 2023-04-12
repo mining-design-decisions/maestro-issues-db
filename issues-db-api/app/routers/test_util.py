@@ -1,8 +1,10 @@
 from fastapi.testclient import TestClient
 
 from app import app
-from app.dependencies import users_collection, manual_labels_collection, model_collection, jira_repos_db,\
-    issue_links_collection, projects_collection, tags_collection, mining_add_db, embeddings_collection
+from app.dependencies import users_collection, issue_labels_collection, models_collection, jira_repos_db,\
+    issue_links_collection, projects_collection, tags_collection, mining_add_db, embeddings_collection, mongo_client
+from app.schemas import issue_labels_collection_schema, issue_links_collection_schema, tags_collection_schema,\
+    projects_collection_schema, dl_models_collection_schema, embeddings_collection_schema, users_collection_schema
 from .authentication import get_password_hash
 
 client = TestClient(app.app)
@@ -21,8 +23,8 @@ def setup_users_db():
 
 def restore_dbs():
     users_collection.drop()
-    manual_labels_collection.drop()
-    model_collection.drop()
+    issue_labels_collection.drop()
+    models_collection.drop()
     jira_repos_db['Apache'].drop()
     issue_links_collection.drop()
     projects_collection.drop()
@@ -30,6 +32,14 @@ def restore_dbs():
     mining_add_db['fs_file'].drop()
     mining_add_db['fs_chunks'].drop()
     embeddings_collection.drop()
+
+    mining_add_db.create_collection('IssueLabels', validator=issue_labels_collection_schema)
+    mining_add_db.create_collection('IssueLinks', validator=issue_links_collection_schema)
+    mining_add_db.create_collection('Tags', validator=tags_collection_schema)
+    mining_add_db.create_collection('Projects', validator=projects_collection_schema)
+    mining_add_db.create_collection('DLModels', validator=dl_models_collection_schema)
+    mining_add_db.create_collection('DLEmbeddings', validator=embeddings_collection_schema)
+    mongo_client['Users'].create_collection('Users', validator=users_collection_schema)
 
 
 def get_auth_header():

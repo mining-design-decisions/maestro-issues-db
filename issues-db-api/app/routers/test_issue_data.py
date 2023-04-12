@@ -1,13 +1,9 @@
-from fastapi.testclient import TestClient
 from fastapi import HTTPException
 import pytest
 
-from app import app
 from app.dependencies import jira_repos_db, issue_links_collection
 from .issue_data import get_issue_data, IssueDataIn
 from .test_util import restore_dbs
-
-client = TestClient(app.app)
 
 
 def setup_db():

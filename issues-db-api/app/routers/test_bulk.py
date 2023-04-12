@@ -1,13 +1,13 @@
 from .test_util import client
 from .test_util import setup_users_db, restore_dbs, get_auth_header, auth_test_post
 from .bulk import get_issue_ids_from_keys, IssueKeysIn
-from app.dependencies import manual_labels_collection, tags_collection, jira_repos_db
+from app.dependencies import issue_labels_collection, tags_collection, jira_repos_db
 import pytest
 from fastapi import HTTPException
 
 
 def setup_db():
-    manual_labels_collection.insert_one({
+    issue_labels_collection.insert_one({
         '_id': 'Apache-01',
         'existence': False,
         'property': False,
@@ -37,11 +37,11 @@ def test_add_tags_in_bulk():
         }]
     }
     assert client.post('/bulk/add-tags', headers=headers, json=payload).status_code == 200
-    assert manual_labels_collection.find_one({'_id': 'Apache-01'}, ['tags'])['tags'] == ['tag']
+    assert issue_labels_collection.find_one({'_id': 'Apache-01'}, ['tags'])['tags'] == ['tag']
 
     # Insert existing tag
     assert client.post('/bulk/add-tags', headers=headers, json=payload).status_code == 200
-    assert manual_labels_collection.find_one({'_id': 'Apache-01'}, ['tags'])['tags'] == ['tag']
+    assert issue_labels_collection.find_one({'_id': 'Apache-01'}, ['tags'])['tags'] == ['tag']
 
     # Insert illegal tag
     payload = {
@@ -51,7 +51,7 @@ def test_add_tags_in_bulk():
         }]
     }
     assert client.post('/bulk/add-tags', headers=headers, json=payload).status_code == 404
-    assert manual_labels_collection.find_one({'_id': 'Apache-01'}, ['tags'])['tags'] == ['tag']
+    assert issue_labels_collection.find_one({'_id': 'Apache-01'}, ['tags'])['tags'] == ['tag']
 
     # Test non-existing issue
     payload = {
@@ -61,7 +61,7 @@ def test_add_tags_in_bulk():
         }]
     }
     assert client.post('/bulk/add-tags', headers=headers, json=payload).status_code == 404
-    assert manual_labels_collection.find_one({'_id': 'Apache-01'}, ['tags'])['tags'] == ['tag']
+    assert issue_labels_collection.find_one({'_id': 'Apache-01'}, ['tags'])['tags'] == ['tag']
 
     restore_dbs()
 

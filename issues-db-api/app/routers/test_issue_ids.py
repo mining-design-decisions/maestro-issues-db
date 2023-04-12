@@ -1,17 +1,17 @@
-from app.dependencies import manual_labels_collection, jira_repos_db
+from app.dependencies import issue_labels_collection, jira_repos_db
 from .test_util import client, restore_dbs
 from .issue_ids import get_issue_ids, IssueIdsIn
 
 
 def setup_db():
-    manual_labels_collection.insert_one({
+    issue_labels_collection.insert_one({
         '_id': 'Apache-01',
         'existence': False,
         'property': False,
         'executive': True,
         'tags': ['Tag-01']
     })
-    manual_labels_collection.insert_one({
+    issue_labels_collection.insert_one({
         '_id': 'Apache-02',
         'existence': False,
         'property': False,

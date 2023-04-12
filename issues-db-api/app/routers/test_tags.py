@@ -1,6 +1,6 @@
 from .test_util import client
 from .test_util import setup_users_db, restore_dbs, get_auth_header, auth_test_post, auth_test_delete
-from app.dependencies import tags_collection, projects_collection
+from app.dependencies import tags_collection, projects_collection, issue_labels_collection
 
 
 def setup_db():
@@ -8,6 +8,11 @@ def setup_db():
         '_id': 'tag',
         'description': 'text',
         'type': 'manual-tag'
+    })
+    projects_collection.insert_one({
+        '_id': 'Apache-HADOOP',
+        'repo': 'Apache',
+        'project': 'HADOOP'
     })
 
 
@@ -21,6 +26,10 @@ def test_get_tags():
             'name': 'tag',
             'description': 'text',
             'type': 'manual-tag'
+        }, {
+            'name': 'Apache-HADOOP',
+            'description': '',
+            'type': 'project'
         }]
     }
 
@@ -110,9 +119,16 @@ def test_delete_tag():
     auth_test_delete('/tags/tag')
     headers = get_auth_header()
 
+    # Insert issue with the tag
+    issue_labels_collection.insert_one({
+        '_id': 'Apache-01',
+        'tags': ['tag']
+    })
+
     # Delete tag
     assert client.delete('/tags/tag', headers=headers).status_code == 200
     assert tags_collection.find_one({'_id': 'tag'}) is None
+    assert issue_labels_collection.find_one({'_id': 'Apache-01'})['tags'] == []
 
     # Non-existing tag
     assert client.delete('/tags/tag', headers=headers).status_code == 404

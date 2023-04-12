@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from app.dependencies import manual_labels_collection, tags_collection
+from app.dependencies import issue_labels_collection, tags_collection
 from app.exceptions import issue_not_found_exception, illegal_tag_insertion_exception, tag_exists_for_issue_exception,\
     non_existing_tag_for_issue_exception
 from app.routers.authentication import validate_token
@@ -20,7 +20,7 @@ class Tags(BaseModel):
 
 
 def _update_manual_label(issue_id: str, update: dict):
-    result = manual_labels_collection.update_one(
+    result = issue_labels_collection.update_one(
         {'_id': issue_id},
         update,
     )
@@ -40,7 +40,7 @@ def finish_review(issue_id: str, token=Depends(validate_token)):
 
 @router.get('/{issue_id}/tags', response_model=Tags)
 def get_tags(issue_id: str):
-    issue = manual_labels_collection.find_one({'_id': issue_id}, ['tags'])
+    issue = issue_labels_collection.find_one({'_id': issue_id}, ['tags'])
     if issue is None:
         raise issue_not_found_exception(issue_id)
     return Tags(tags=issue['tags'])
@@ -52,7 +52,7 @@ def add_tag(issue_id: str, request: Tag, token=Depends(validate_token)):
     allowed_tags = set([tag['_id'] for tag in allowed_tags])
     if request.tag not in allowed_tags:
         raise illegal_tag_insertion_exception(request.tag)
-    result = manual_labels_collection.update_one(
+    result = issue_labels_collection.update_one(
         {
             '_id': issue_id,
             'tags': {'$ne': request.tag}
@@ -62,14 +62,14 @@ def add_tag(issue_id: str, request: Tag, token=Depends(validate_token)):
         }
     )
     if result.modified_count != 1:
-        if manual_labels_collection.find_one({'_id': issue_id}) is None:
+        if issue_labels_collection.find_one({'_id': issue_id}) is None:
             raise issue_not_found_exception(issue_id)
         raise tag_exists_for_issue_exception(request.tag, issue_id)
 
 
 @router.delete('/{issue_id}/tags/{tag}')
 def delete_tag(issue_id: str, tag: str, token=Depends(validate_token)):
-    result = manual_labels_collection.update_one(
+    result = issue_labels_collection.update_one(
         {
             '_id': issue_id,
             'tags': tag
@@ -79,6 +79,6 @@ def delete_tag(issue_id: str, tag: str, token=Depends(validate_token)):
         }
     )
     if result.modified_count != 1:
-        if manual_labels_collection.find_one({'_id': issue_id}) is None:
+        if issue_labels_collection.find_one({'_id': issue_id}) is None:
             raise issue_not_found_exception(issue_id)
         raise non_existing_tag_for_issue_exception(tag, issue_id)

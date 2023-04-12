@@ -1,7 +1,7 @@
 import typing
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
-from app.dependencies import manual_labels_collection
+from app.dependencies import issue_labels_collection
 from app.routers.authentication import validate_token
 from app.routers.issues import _update_manual_label
 from app.exceptions import issue_not_found_exception, manual_labels_not_found_exception, comment_not_found_exception,\
@@ -66,7 +66,7 @@ class CommentIdOut(BaseModel):
 
 
 def _update_comment(issue_id: str, comment_id: str, username: str, update: dict):
-    result = manual_labels_collection.update_one(
+    result = issue_labels_collection.update_one(
         {
             '_id': issue_id,
             f'comments.{comment_id}': {'$exists': True},
@@ -75,7 +75,7 @@ def _update_comment(issue_id: str, comment_id: str, username: str, update: dict)
         update
     )
     if result.modified_count != 1:
-        issue = manual_labels_collection.find_one({'_id': issue_id})
+        issue = issue_labels_collection.find_one({'_id': issue_id})
         if issue is None:
             raise issue_not_found_exception(issue_id)
         elif 'comments' not in issue or comment_id not in issue['comments']:
@@ -90,7 +90,7 @@ def get_manual_labels(request: ManualLabelsIn):
     Returns the manual labels of the issue ids that were
     provided in the request body.
     """
-    issues = manual_labels_collection.find(
+    issues = issue_labels_collection.find(
         {
             '$and': [
                 {'_id': {'$in': request.issue_ids}},
@@ -120,7 +120,7 @@ def update_manual_label(issue_id: str, request: Label, token=Depends(validate_to
     """
     Update the manual label of the given issue.
     """
-    result = manual_labels_collection.update_one(
+    result = issue_labels_collection.update_one(
         {'_id': issue_id},
         {
             '$set': request,
@@ -136,7 +136,7 @@ def get_comments(issue_id: str):
     """
     Gets the comments for the specified issue.
     """
-    issue = manual_labels_collection.find_one(
+    issue = issue_labels_collection.find_one(
         {'_id': issue_id},
         ['comments']
     )

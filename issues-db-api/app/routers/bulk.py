@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from app.dependencies import manual_labels_collection, tags_collection, jira_repos_db
+from app.dependencies import issue_labels_collection, tags_collection, jira_repos_db
 from app.routers.authentication import validate_token
 from app.exceptions import illegal_tags_insertion_exception, issues_not_found_exception, repo_not_found_exception,\
     issue_not_found_exception
@@ -63,7 +63,7 @@ def add_tags_in_bulk(request: AddTagsIn, token=Depends(validate_token)):
     # Add tags
     not_found_keys = set()
     for issue in request.data:
-        result = manual_labels_collection.update_one(
+        result = issue_labels_collection.update_one(
             {'_id': issue.issue_id},
             {'$addToSet': {'tags': {'$each': issue.tags}}}
         )

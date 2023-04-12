@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from app.dependencies import manual_labels_collection, jira_repos_db
+from app.dependencies import issue_labels_collection, jira_repos_db
 from app.exceptions import repo_not_found_exception, issue_not_found_exception
 
 router = APIRouter(
@@ -43,7 +43,7 @@ def get_issue_ids(request: IssueIdsIn):
     the provided filtering options. These filtering options are
     given in the body of the request.
     """
-    issues = manual_labels_collection.find(
+    issues = issue_labels_collection.find(
         request.filter,
         ['_id']
     )

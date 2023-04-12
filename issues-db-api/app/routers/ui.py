@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
-from app.dependencies import manual_labels_collection, jira_repos_db, issue_links_collection
+from app.dependencies import issue_labels_collection, jira_repos_db, issue_links_collection
 import math
 
 router = APIRouter(
@@ -15,31 +15,40 @@ class Query(BaseModel):
     models: list[dict[str, str]]
     page: int
     limit: int
-    # sort = {
-    #     'model-id': str,
-    #     'version-id': str,
-    #     'class': str
-    # }
-    # models = [
-    #     {
-    #         'model-id': str,
-    #         'version-id': str
-    #     }
-    # ]
+
+    class Config:
+        schema_extra = {
+            "example": {
+                'filter': 'object',
+                'sort': {
+                    'model-id': 'string',
+                    'version-id': 'string',
+                    'class': 'string'
+                },
+                'models': [
+                    {
+                        'model-id': 'string',
+                        'version-id': 'string'
+                    }
+                ],
+                'page': 42,
+                'limit': 42
+            }
+        }
 
 
 @router.get('')
 def get_ui_data(request: Query):
     page = request.page - 1
     limit = request.limit
-    total_pages = math.ceil(manual_labels_collection.count_documents(request.filter) / limit)
+    total_pages = math.ceil(issue_labels_collection.count_documents(request.filter) / limit)
 
     if request.sort is not None:
-        issues = manual_labels_collection.find(request.filter)\
+        issues = issue_labels_collection.find(request.filter)\
             .sort(f'predictions.{request.sort["model-id"]}-{request.sort["version-id"]}.{request.sort["class"]}', -1)\
             .skip(page * limit).limit(limit)
     else:
-        issues = manual_labels_collection.find(request.filter).skip(page * limit).limit(limit)
+        issues = issue_labels_collection.find(request.filter).skip(page * limit).limit(limit)
 
     response = []
     for issue in issues:

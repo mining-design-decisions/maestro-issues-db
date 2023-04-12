@@ -1,5 +1,5 @@
 from .test_util import client
-from app.dependencies import manual_labels_collection, model_collection, fs
+from app.dependencies import issue_labels_collection, models_collection, fs
 from .test_util import setup_users_db, restore_dbs, get_auth_header, auth_test_post, auth_test_delete
 from .models import get_predictions, GetPredictionsIn, GetPredictionsOut
 from bson import ObjectId
@@ -11,7 +11,7 @@ def setup_db():
     time = datetime.datetime.utcnow().isoformat()
     version_id = fs.put(io.BytesIO(bytes('mock data', 'utf-8')), filename='filename')
     model_id = ObjectId()
-    model_collection.insert_one({
+    models_collection.insert_one({
         '_id': model_id,
         'name': 'model_name',
         'config': {'key': 'value'},
@@ -21,7 +21,7 @@ def setup_db():
         }
     })
 
-    manual_labels_collection.insert_one({
+    issue_labels_collection.insert_one({
         '_id': 'Apache-01',
         'predictions': {
             f'{model_id}-{version_id}': {
@@ -32,7 +32,7 @@ def setup_db():
             }
         }
     })
-    manual_labels_collection.create_index(f'predictions.{model_id}-{version_id}.existence.confidence')
+    issue_labels_collection.create_index(f'predictions.{model_id}-{version_id}.existence.confidence')
 
     return model_id, version_id, time
 
@@ -59,7 +59,7 @@ def test_create_model():
     # Create model with no name
     payload = {'model_name': None, 'model_config': {'key': 'value'}}
     model_id = client.post('/models', headers=headers, json=payload).json()['model_id']
-    assert model_collection.find_one({'_id': ObjectId(model_id)}) == {
+    assert models_collection.find_one({'_id': ObjectId(model_id)}) == {
         '_id': ObjectId(model_id),
         'name': '',
         'config': {'key': 'value'},
@@ -70,7 +70,7 @@ def test_create_model():
     # Create model with name
     payload = {'model_name': 'model_name', 'model_config': {'key': 'value'}}
     model_id = client.post('/models', headers=headers, json=payload).json()['model_id']
-    assert model_collection.find_one({'_id': ObjectId(model_id)}) == {
+    assert models_collection.find_one({'_id': ObjectId(model_id)}) == {
         '_id': ObjectId(model_id),
         'name': 'model_name',
         'config': {'key': 'value'},
@@ -109,7 +109,7 @@ def test_update_model():
     # Update model
     payload = {'model_name': 'new-name', 'model_config': {'new-key': 'new-value'}}
     assert client.post(f'/models/{model_id}', headers=headers, json=payload).status_code == 200
-    assert model_collection.find_one({'_id': ObjectId(model_id)}, ['name', 'config']) == {
+    assert models_collection.find_one({'_id': ObjectId(model_id)}, ['name', 'config']) == {
         '_id': ObjectId(model_id),
         'name': 'new-name',
         'config': {'new-key': 'new-value'}
@@ -131,7 +131,7 @@ def test_delete_model():
 
     # Delete model
     assert client.delete(f'/models/{model_id}', headers=headers).status_code == 200
-    assert model_collection.find_one({'_id': model_id}) is None
+    assert models_collection.find_one({'_id': model_id}) is None
     assert fs.exists(version_id) is False
 
     # Non-existing model
@@ -152,7 +152,7 @@ def test_create_model_version():
     time = datetime.datetime.utcnow().isoformat()
     files = {'time': (None, time), 'file': ('filename', io.BytesIO(bytes('mock data', 'utf-8')))}
     version_id = client.post(f'/models/{model_id}/versions', headers=headers, files=files).json()['version_id']
-    assert model_collection.find_one({'_id': model_id})['versions'][1]['id'] == ObjectId(version_id)
+    assert models_collection.find_one({'_id': model_id})['versions'][1]['id'] == ObjectId(version_id)
     assert fs.get(ObjectId(version_id)).read() == bytes('mock data', 'utf-8')
 
     # Non-existing model
@@ -199,7 +199,7 @@ def test_delete_model_version():
 
     # Delete version
     assert client.delete(f'/models/{model_id}/versions/{version_id}', headers=headers).status_code == 200
-    assert model_collection.find_one({'_id': model_id})['versions'] == []
+    assert models_collection.find_one({'_id': model_id})['versions'] == []
     assert fs.exists(version_id) is False
 
     # Non-existing version
@@ -229,7 +229,7 @@ def test_post_predictions():
     }
     response = client.post(f'/models/{model_id}/versions/{version_id}/predictions', headers=headers, json=payload)
     assert response.status_code == 200
-    assert manual_labels_collection.find_one({'_id': 'Apache-01'})['predictions'] == {
+    assert issue_labels_collection.find_one({'_id': 'Apache-01'})['predictions'] == {
         f'{model_id}-{version_id}': {
             'property': {
                 'confidence': 0.42,
@@ -237,7 +237,7 @@ def test_post_predictions():
             }
         }
     }
-    assert len(manual_labels_collection.index_information()) == 3
+    assert len(issue_labels_collection.index_information()) == 3
 
     # Non-existing version
     response = client.post(f'/models/{model_id}/versions/{ObjectId()}/predictions', headers=headers, json=payload)
@@ -292,7 +292,7 @@ def test_delete_predictions():
 
     # Delete version
     assert client.delete(f'/models/{model_id}/versions/{version_id}/predictions', headers=headers).status_code == 200
-    assert manual_labels_collection.find_one({'_id': 'Apache-01'})['predictions'] == {}
+    assert issue_labels_collection.find_one({'_id': 'Apache-01'})['predictions'] == {}
 
     # Non-existing version
     assert client.delete(f'/models/{model_id}/versions/{ObjectId()}/predictions', headers=headers).status_code == 404
@@ -312,7 +312,7 @@ def test_post_performance():
     time = datetime.datetime.utcnow().isoformat()
     payload = {'time': time, 'performance': [{'key': 'value'}]}
     assert client.post(f'/models/{model_id}/performances', headers=headers, json=payload).status_code == 200
-    assert model_collection.find_one({'_id': model_id})['performances'][time.replace(".", "_")] == [{'key': 'value'}]
+    assert models_collection.find_one({'_id': model_id})['performances'][time.replace(".", "_")] == [{'key': 'value'}]
 
     # Non-existing model
     assert client.post(f'/models/{ObjectId()}/performances', headers=headers, json=payload).status_code == 404
@@ -352,7 +352,7 @@ def test_delete_performance():
 
     # Delete version
     assert client.delete(f'/models/{model_id}/performances/{time}', headers=headers).status_code == 200
-    assert model_collection.find_one({'_id': model_id})['performances'] == {}
+    assert models_collection.find_one({'_id': model_id})['performances'] == {}
 
     # Non-existing model
     assert client.delete(f'/models/{ObjectId()}/performances/{time}', headers=headers).status_code == 404

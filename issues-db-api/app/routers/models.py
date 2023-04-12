@@ -2,7 +2,7 @@ import typing
 from fastapi import APIRouter, UploadFile, Response, Form, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from app.dependencies import fs, model_collection, manual_labels_collection
+from app.dependencies import fs, models_collection, issue_labels_collection
 from app.routers.authentication import validate_token
 from bson import ObjectId
 from app.util import read_file_in_chunks
@@ -135,7 +135,7 @@ class VersionsOut(BaseModel):
 
 
 def _get_model(model_id: str, attributes: list[str]):
-    model = model_collection.find_one(
+    model = models_collection.find_one(
         {'_id': ObjectId(model_id)},
         attributes
     )
@@ -145,7 +145,7 @@ def _get_model(model_id: str, attributes: list[str]):
 
 
 def _update_model(model_id: str, update: dict):
-    result = model_collection.update_one(
+    result = models_collection.update_one(
         {'_id': ObjectId(model_id)},
         update
     )
@@ -158,16 +158,16 @@ def _update_model(model_id: str, update: dict):
 
 def _delete_predictions(model_id: str, version_id: ObjectId):
     # Remove predictions
-    manual_labels_collection.update_many(
+    issue_labels_collection.update_many(
         {},
         {'$unset': {f'predictions.{model_id}-{version_id}': ""}}
     )
     # Remove indexes
-    indexes = manual_labels_collection.index_information()
+    indexes = issue_labels_collection.index_information()
     for key, value in indexes.items():
         for col in value['key']:
             if f'predictions.{model_id}-{version_id}' in col[0]:
-                manual_labels_collection.drop_index(key)
+                issue_labels_collection.drop_index(key)
                 break
 
 
@@ -182,7 +182,7 @@ def get_all_models():
     """
     Returns a list of all models in the database.
     """
-    models = model_collection.find({}, ['name'])
+    models = models_collection.find({}, ['name'])
     response = []
     for model in models:
         response.append(SimpleModelOut(model_id=str(model['_id']), model_name=model['name']))
@@ -194,7 +194,7 @@ def create_model(request: PostModelIn, token=Depends(validate_token)):
     """
     Creates a new model entry with the given config.
     """
-    _id = model_collection.insert_one({
+    _id = models_collection.insert_one({
         'name': '' if request.model_name is None else request.model_name,
         'config': request.model_config,
         'versions': [],
@@ -231,7 +231,7 @@ def update_model(model_id: str, request: UpdateModelIn, token=Depends(validate_t
 
 @router.delete('/{model_id}')
 def delete_model(model_id: str, token=Depends(validate_token)):
-    model = model_collection.find_one({'_id': ObjectId(model_id)})
+    model = models_collection.find_one({'_id': ObjectId(model_id)})
     if model is None:
         raise model_not_found_exception(model_id)
 
@@ -240,7 +240,7 @@ def delete_model(model_id: str, token=Depends(validate_token)):
         _delete_version(model_id, version['id'])
 
     # Delete the model itself, including performances
-    model_collection.delete_one({'_id': ObjectId(model_id)})
+    models_collection.delete_one({'_id': ObjectId(model_id)})
 
 
 @router.post('/{model_id}/versions')
@@ -298,8 +298,8 @@ def delete_model_version(model_id: str, version_id: str, token=Depends(validate_
         version = model['versions'][idx]
         if version_id == str(version['id']):
             _delete_version(model_id, version['id'])
-            model_collection.update_one({'_id': ObjectId(model_id)}, {'$unset': {f'versions.{idx}': ''}})
-            model_collection.update_one({'_id': ObjectId(model_id)}, {'$pull': {f'versions': None}})
+            models_collection.update_one({'_id': ObjectId(model_id)}, {'$unset': {f'versions.{idx}': ''}})
+            models_collection.update_one({'_id': ObjectId(model_id)}, {'$pull': {f'versions': None}})
             return
     raise version_not_found_exception(version_id, model_id)
 
@@ -325,7 +325,7 @@ def post_predictions(
         for predicted_class in predicted_classes:
             predictions[predicted_class] = predicted_classes[predicted_class]
             classes.add(predicted_class)
-        result = manual_labels_collection.update_one(
+        result = issue_labels_collection.update_one(
             {'_id': issue_id},
             {'$set': {
                 'predictions': {f'{model_id}-{version_id}': predictions}
@@ -335,13 +335,13 @@ def post_predictions(
             raise issue_not_found_exception(issue_id)
     for class_ in classes:
         # Make sure the predictions are indexed for speed
-        manual_labels_collection.create_index(f'predictions.{model_id}-{version_id}.{class_}.confidence')
+        issue_labels_collection.create_index(f'predictions.{model_id}-{version_id}.{class_}.confidence')
 
 
 @router.get('/{model_id}/versions/{version_id}/predictions', response_model=GetPredictionsOut)
 def get_predictions(model_id: str, version_id: str, request: GetPredictionsIn):
     """
-    Returns the predicted labels of the specified model version.
+    Returns the predicted labels of the specified model version. Set issue_ids to null to get all predictions.
     """
     if request.issue_ids is None:
         filter_ = {f'predictions.{model_id}-{version_id}': {'$exists': True}}
@@ -350,7 +350,7 @@ def get_predictions(model_id: str, version_id: str, request: GetPredictionsIn):
             {'_id': {'$in': request.issue_ids}},
             {f'predictions.{model_id}-{version_id}': {'$exists': True}}
         ]}
-    issues = manual_labels_collection.find(filter_, [f'predictions.{model_id}-{version_id}'])
+    issues = issue_labels_collection.find(filter_, [f'predictions.{model_id}-{version_id}'])
     predictions = dict()
     if request.issue_ids is not None:
         remaining_ids = set(request.issue_ids)
@@ -399,7 +399,7 @@ def get_performances(model_id: str):
     return PerformancesOut(performances=performances)
 
 
-@router.get('/{model_id}/performances/{performance_time}')
+@router.get('/{model_id}/performances/{performance_time}', response_model=PerformanceOut)
 def get_performance(model_id: str, performance_time: str):
     """
     Get the requested performance result.
@@ -414,7 +414,7 @@ def get_performance(model_id: str, performance_time: str):
 @router.delete('/{model_id}/performances/{performance_time}')
 def delete_performance(model_id: str, performance_time: str, token=Depends(validate_token)):
     field = f'performances.{performance_time.replace(".", "_")}'
-    result = model_collection.update_one(
+    result = models_collection.update_one(
         {
             '_id': ObjectId(model_id),
             field: {'$exists': True}
@@ -424,6 +424,6 @@ def delete_performance(model_id: str, performance_time: str, token=Depends(valid
         }
     )
     if result.modified_count != 1:
-        if model_collection.find_one({'_id': ObjectId(model_id)}) is None:
+        if models_collection.find_one({'_id': ObjectId(model_id)}) is None:
             raise model_not_found_exception(model_id)
         raise performance_not_found_exception(performance_time, model_id)
