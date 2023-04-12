@@ -79,15 +79,15 @@ issue_labels_collection_schema = {
                 "description": "'_id' must be a string"
             },
             "existence": {
-                "bsonType": "bool",
+                "bsonType": ["bool", "null"],
                 "description": "'existence' must be a boolean"
             },
             "property": {
-                "bsonType": "bool",
+                "bsonType": ["bool", "null"],
                 "description": "'property' must be a boolean"
             },
             "executive": {
-                "bsonType": "bool",
+                "bsonType": ["bool", "null"],
                 "description": "'executive' must be a boolean"
             },
             "tags": {

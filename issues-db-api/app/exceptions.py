@@ -146,3 +146,17 @@ def comment_author_exception(comment_id: str, issue_id: str):
         status_code=403,
         detail=f'You are not the author of comment {comment_id} of issue {issue_id}'
     )
+
+
+def ui_sort_exception(syntax_error: str):
+    return HTTPException(
+        status_code=422,
+        detail=f'Cannot sort on: {syntax_error}'
+    )
+
+
+def version_not_specified_exception(model: str):
+    return HTTPException(
+        status_code=422,
+        detail=f'Version not specified for model: {model}'
+    )
