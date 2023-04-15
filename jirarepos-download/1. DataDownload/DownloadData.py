@@ -4,6 +4,7 @@ from requests.packages.urllib3.util.retry import Retry
 from requests.auth import HTTPBasicAuth
 from jira import JIRA
 from multiprocessing import Pool
+import config
 
 from pymongo import MongoClient  # Database to store the data
 import json  # File IO
@@ -182,7 +183,7 @@ def get_jira_server(jira_data_source, disable_auth=False):
     server = jira_data_source['jira_url']
     if disable_auth or jira_data_source['name'] != 'Apache':
         return JIRA(server)
-    return JIRA(server, basic_auth=('Mohamed_Soliman', 'Smbam@2005'))
+    return JIRA(server, basic_auth=(config.username, config.password))
 
 
 def get_response(jira, start_index, iteration_max=100):

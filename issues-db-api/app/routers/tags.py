@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from app.dependencies import manual_labels_collection, tags_collection
+from app.dependencies import tags_collection, projects_collection, issue_labels_collection
 from app.routers.authentication import validate_token
 from pymongo.errors import DuplicateKeyError
+from app.exceptions import tag_exists_exception, tag_not_found_exception
 
 router = APIRouter(
     prefix='/tags',
@@ -10,16 +11,34 @@ router = APIRouter(
 )
 
 
-class Tag(BaseModel):
+class NewTag(BaseModel):
     tag: str
     description: str
 
 
-class AddTagsIn(BaseModel):
-    data: dict[str, list[str]]
+class UpdateTag(BaseModel):
+    description: str
 
 
-@router.get('')
+class Tag(BaseModel):
+    tag: str
+
+
+class DbTag(BaseModel):
+    name: str
+    description: str
+    type: str
+
+
+class TagsOut(BaseModel):
+    tags: list[DbTag]
+
+
+class TagOut(BaseModel):
+    tag: DbTag
+
+
+@router.get('', response_model=TagsOut)
 def get_tags():
     """
     Retrieve all unique tags in the database.
@@ -27,19 +46,28 @@ def get_tags():
     tags = tags_collection.find({})
     response = []
     for tag in tags:
-        response.append({
-            'name': tag['_id'],
-            'description': tag['description'],
-            'type': tag['type']
-        })
-    return {'tags': response}
+        response.append(DbTag(
+            name=tag['_id'],
+            description=tag['description'],
+            type=tag['type']
+        ))
+    projects = projects_collection.find({})
+    for project in projects:
+        response.append(DbTag(
+            name=project['_id'],
+            description='',
+            type='project'
+        ))
+    return TagsOut(tags=response)
 
 
 @router.post('')
-def create_tag(tag: Tag, token=Depends(validate_token)):
+def create_tag(tag: NewTag, token=Depends(validate_token)):
     """
     Create a new manual tag with the given description.
     """
+    if projects_collection.find_one({'_id': tag.tag}) is not None:
+        raise tag_exists_exception(tag.tag)
     try:
         tags_collection.insert_one({
             '_id': tag.tag,
@@ -47,42 +75,40 @@ def create_tag(tag: Tag, token=Depends(validate_token)):
             'type': 'manual-tag'
         })
     except DuplicateKeyError:
-        return HTTPException(
-            status_code=409,
-            detail=f'Tag {tag.tag} already exists'
-        )
+        raise tag_exists_exception(tag.tag)
 
 
-@router.post('/add-tags')
-def add_tags(request: AddTagsIn, token=Depends(validate_token)):
+@router.get('/{tag}', response_model=TagOut)
+def get_tag(tag: str):
     """
-    Method for adding tags to issues in bulk. The tags and
-    issue ids should be specified in the request body.
+    Retrieve info for the given tag.
     """
-    # Check if tags may be inserted
-    tags = set()
-    for issue_id in request.data:
-        for tag in request.data[issue_id]:
-            tags.add(tag)
-    allowed_tags = tags_collection.find({'type': 'manual-tag'}, ['_id'])
-    allowed_tags = set([tag['_id'] for tag in allowed_tags])
-    if not tags.issubset(allowed_tags):
-        return HTTPException(
-            status_code=409,
-            detail=f'The following tags may not be inserted: {list(tags - allowed_tags)}'
-        )
+    tag_ = tags_collection.find_one({'_id': tag})
+    if tag_ is None:
+        raise tag_not_found_exception(tag)
+    return TagOut(tag=DbTag(
+        name=tag_['_id'],
+        description=tag_['description'],
+        type=tag_['type']
+    ))
 
-    # Add tags
-    not_found_keys = set()
-    for issue_id in request.data:
-        result = manual_labels_collection.update_one(
-            {'_id': issue_id},
-            {'$addToSet': {'tags': {'$each': request.data[issue_id]}}}
-        )
-        if result.matched_count == 0:
-            not_found_keys.add(issue_id)
-    if not_found_keys:
-        raise HTTPException(
-            status_code=404,
-            detail=f'The following issues were not found: {list(not_found_keys)}'
-        )
+
+@router.post('/{tag}')
+def update_tag(tag: str, request: UpdateTag, token=Depends(validate_token)):
+    """
+    Retrieve info for the given tag.
+    """
+    result = tags_collection.update_one(
+        {'_id': tag},
+        {'$set': {'description': request.description}}
+    )
+    if result.matched_count != 1:
+        raise tag_not_found_exception(tag)
+
+
+@router.delete('/{tag}')
+def delete_tag(tag: str, token=Depends(validate_token)):
+    result = tags_collection.delete_one({'_id': tag})
+    if result.deleted_count != 1:
+        raise tag_not_found_exception(tag)
+    issue_labels_collection.update_many({'tags': tag}, {'$pull': {'tags': tag}})
