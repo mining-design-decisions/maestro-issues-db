@@ -43,8 +43,8 @@ class UIData(BaseModel):
     issue_id: str
     issue_link: str
     issue_key: str
-    summary: str
-    description: str
+    summary: str | None
+    description: str | None
     manual_label: ManualLabel
     predictions: dict[str, dict | None]
     tags: list[str]
