@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel
 from app.dependencies import issue_labels_collection, jira_repos_db
 from app.exceptions import repo_not_found_exception, issue_not_found_exception
