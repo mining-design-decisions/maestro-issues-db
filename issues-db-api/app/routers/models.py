@@ -82,7 +82,7 @@ class PerformancesOut(BaseModel):
 
 class PerformanceOut(BaseModel):
     performance_time: str
-    performance: dict
+    performance: list
 
 
 class PostPredictionsIn(BaseModel):
@@ -128,6 +128,10 @@ class GetPredictionsOut(BaseModel):
 class VersionOut(BaseModel):
     version_id: str
     time: str
+
+
+class VersionIdOut(BaseModel):
+    version_id: str
 
 
 class VersionsOut(BaseModel):
@@ -243,7 +247,7 @@ def delete_model(model_id: str, token=Depends(validate_token)):
     models_collection.delete_one({'_id': ObjectId(model_id)})
 
 
-@router.post('/{model_id}/versions')
+@router.post('/{model_id}/versions', response_model=VersionIdOut)
 def create_model_version(
         model_id: str,
         time: str = Form(),
@@ -260,9 +264,7 @@ def create_model_version(
             'time': time.replace('.', '_')
         }
     }})
-    return {
-        'version_id': str(version_id)
-    }
+    return VersionIdOut(version_id=version_id)
 
 
 @router.get('/{model_id}/versions', response_model=VersionsOut)
