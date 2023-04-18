@@ -22,7 +22,8 @@ default_value = {
     'attachments': [],
     'sub-tasks': [],
     'resolution': None,
-    'assignee': None
+    'assignee': None,
+    'resolutiondate': None
 }
 
 
