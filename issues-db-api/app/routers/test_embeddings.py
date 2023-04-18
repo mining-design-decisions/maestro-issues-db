@@ -24,7 +24,8 @@ def test_get_all_embeddings():
     assert client.get('/embeddings').json() == {'embeddings': [{
         'embedding_id': str(embedding_id),
         'name': 'embedding-name',
-        'config': {'key': 'value'}
+        'config': {'key': 'value'},
+        'has_file': False
     }]}
 
     restore_dbs()
@@ -47,6 +48,40 @@ def test_create_embedding():
         'config': config,
         'file_id': None
     }
+
+    restore_dbs()
+
+
+def test_get_embedding():
+    restore_dbs()
+    embedding_id = setup_db()
+
+    # Get embedding
+    assert client.get(f'/embeddings/{embedding_id}').json() == {
+        'embedding_id': str(embedding_id),
+        'name': 'embedding-name',
+        'config': {'key': 'value'},
+        'has_file': False
+    }
+
+    # Upload file
+    file = io.BytesIO(bytes('mock data', 'utf-8'))
+    file_id = fs.put(file, filename='filename.txt')
+    embeddings_collection.update_one({'_id': embedding_id}, {'$set': {'file_id': file_id}})
+
+    # Get embedding with file
+    assert client.get(f'/embeddings/{embedding_id}').json() == {
+        'embedding_id': str(embedding_id),
+        'name': 'embedding-name',
+        'config': {'key': 'value'},
+        'has_file': True
+    }
+
+    # Test random id
+    assert client.get('/embeddings/random-id').status_code == 422
+
+    # Test non-existing id
+    assert client.get(f'/embeddings/{ObjectId()}').status_code == 404
 
     restore_dbs()
 

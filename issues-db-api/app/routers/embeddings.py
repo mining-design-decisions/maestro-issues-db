@@ -18,6 +18,7 @@ class EmbeddingOut(BaseModel):
     embedding_id: str
     name: str
     config: dict
+    has_file: bool
 
 
 class EmbeddingsOut(BaseModel):
@@ -53,7 +54,8 @@ def get_all_embeddings():
         embeddings.append(EmbeddingOut(
             embedding_id=str(embedding['_id']),
             name=embedding['name'],
-            config=embedding['config']
+            config=embedding['config'],
+            has_file=embedding['file_id'] is not None
         ))
     return EmbeddingsOut(embeddings=embeddings)
 
@@ -71,6 +73,17 @@ def create_embedding(request: UpdateEmbedding, token=Depends(validate_token)):
     return {
         'embedding_id': str(_id)
     }
+
+
+@router.get('/{embedding_id}', response_model=EmbeddingOut)
+def get_embedding(embedding_id: str):
+    embedding = _get_embedding(embedding_id, ['name', 'config', 'file_id'])
+    return EmbeddingOut(
+        embedding_id=str(embedding['_id']),
+        name=embedding['name'],
+        config=embedding['config'],
+        has_file=embedding['file_id'] is not None
+    )
 
 
 @router.post('/{embedding_id}')
