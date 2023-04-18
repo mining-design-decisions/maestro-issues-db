@@ -37,8 +37,12 @@ dl_models_collection_schema = {
                 }
             },
             "performances": {
-                "bsonType": "object",
-                "description": "'performances' must be an object"
+                "bsonType": "array",
+                "description": "'performances' must be a list",
+                "items": {
+                    "bsonType": "objectId",
+                    "description": "'performance' must be an objectId"
+                }
             }
         }
     }

@@ -7,7 +7,10 @@ from app.routers.authentication import validate_token
 from bson import ObjectId
 from app.util import read_file_in_chunks
 from app.exceptions import model_not_found_exception, version_not_found_exception, performance_not_found_exception,\
-    issue_not_found_exception
+    issue_not_found_exception, bson_exception
+import io
+import json
+import bson
 
 router = APIRouter(
     prefix='/models',
@@ -65,8 +68,11 @@ class GetModelsOut(BaseModel):
 
 
 class PostPerformanceIn(BaseModel):
-    time: str
     performance: list
+
+
+class PostPerformanceOut(BaseModel):
+    performance_id: str
 
 
 class PerformancesOut(BaseModel):
@@ -75,13 +81,13 @@ class PerformancesOut(BaseModel):
     class Config:
         schema_extra = {
             "example": {
-                'performances': ['performance_time']
+                'performances': ['performance_id']
             }
         }
 
 
 class PerformanceOut(BaseModel):
-    performance_time: str
+    performance_id: str
     performance: list
 
 
@@ -202,7 +208,7 @@ def create_model(request: PostModelIn, token=Depends(validate_token)):
         'name': '' if request.model_name is None else request.model_name,
         'config': request.model_config,
         'versions': [],
-        'performances': {}
+        'performances': []
     }).inserted_id
     return PostModelOut(model_id=str(_id))
 
@@ -264,7 +270,7 @@ def create_model_version(
             'time': time.replace('.', '_')
         }
     }})
-    return VersionIdOut(version_id=version_id)
+    return VersionIdOut(version_id=str(version_id))
 
 
 @router.get('/{model_id}/versions', response_model=VersionsOut)
@@ -377,7 +383,7 @@ def delete_predictions(model_id: str, version_id: str, token=Depends(validate_to
     raise version_not_found_exception(version_id, model_id)
 
 
-@router.post('/{model_id}/performances')
+@router.post('/{model_id}/performances', response_model=PostPerformanceOut)
 def post_performance(
         model_id: str,
         request: PostPerformanceIn,
@@ -386,9 +392,12 @@ def post_performance(
     """
     Add a performance result for the given model.
     """
-    _update_model(model_id, {'$set': {
-        f'performances.{request.time.replace(".", "_")}': request.performance
-    }})
+    if models_collection.find_one({'_id': ObjectId(model_id)}) is None:
+        raise model_not_found_exception(model_id)
+    file = io.BytesIO(bytes(json.dumps(request.performance), 'utf-8'))
+    file_id = fs.put(file, filename='performance.json')
+    _update_model(model_id, {'$push': {'performances': file_id}})
+    return PostPerformanceOut(performance_id=str(file_id))
 
 
 @router.get('/{model_id}/performances', response_model=PerformancesOut)
@@ -397,35 +406,40 @@ def get_performances(model_id: str):
     Get a list of all performance results for the given model.
     """
     model = _get_model(model_id, ['performances'])
-    performances = [performance.replace("_", ".") for performance in model['performances']]
+    performances = [str(performance) for performance in model['performances']]
     return PerformancesOut(performances=performances)
 
 
-@router.get('/{model_id}/performances/{performance_time}', response_model=PerformanceOut)
-def get_performance(model_id: str, performance_time: str):
+@router.get('/{model_id}/performances/{performance_id}', response_model=PerformanceOut)
+def get_performance(model_id: str, performance_id: str):
     """
     Get the requested performance result.
     """
     model = _get_model(model_id, ['performances'])
+    try:
+        ObjectId(performance_id)
+    except bson.errors.BSONError as e:
+        raise bson_exception(str(e))
+    if ObjectId(performance_id) not in model['performances']:
+        raise performance_not_found_exception(performance_id, model_id)
+    file = fs.get(ObjectId(performance_id))
     return PerformanceOut(
-        performance_time=performance_time.replace("_", "."),
-        performance=model['performances'][performance_time.replace(".", "_")]
+        performance_id=performance_id,
+        performance=json.loads(file.read().decode('utf-8'))
     )
 
 
-@router.delete('/{model_id}/performances/{performance_time}')
-def delete_performance(model_id: str, performance_time: str, token=Depends(validate_token)):
-    field = f'performances.{performance_time.replace(".", "_")}'
-    result = models_collection.update_one(
-        {
-            '_id': ObjectId(model_id),
-            field: {'$exists': True}
-        },
-        {
-            '$unset': {field: ""}
-        }
-    )
-    if result.modified_count != 1:
-        if models_collection.find_one({'_id': ObjectId(model_id)}) is None:
-            raise model_not_found_exception(model_id)
-        raise performance_not_found_exception(performance_time, model_id)
+@router.delete('/{model_id}/performances/{performance_id}')
+def delete_performance(model_id: str, performance_id: str, token=Depends(validate_token)):
+    try:
+        result = models_collection.update_one(
+            {'_id': ObjectId(model_id)},
+            {'$pull': {'performances': ObjectId(performance_id)}}
+        )
+    except bson.errors.BSONError as e:
+        raise bson_exception(str(e))
+    if result.matched_count == 0:
+        raise model_not_found_exception(model_id)
+    if result.modified_count == 0:
+        raise performance_not_found_exception(performance_id, model_id)
+    fs.delete(ObjectId(performance_id))

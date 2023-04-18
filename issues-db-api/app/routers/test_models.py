@@ -5,20 +5,21 @@ from .models import get_predictions, GetPredictionsIn, GetPredictionsOut
 from bson import ObjectId
 import datetime
 import io
+import json
 
 
 def setup_db():
     time = datetime.datetime.utcnow().isoformat()
     version_id = fs.put(io.BytesIO(bytes('mock data', 'utf-8')), filename='filename')
+    file = io.BytesIO(bytes(json.dumps([{'key': 'value'}]), 'utf-8'))
+    performance_id = fs.put(file)
     model_id = ObjectId()
     models_collection.insert_one({
         '_id': model_id,
         'name': 'model_name',
         'config': {'key': 'value'},
         'versions': [{'id': version_id, 'time': time.replace('.', '_')}],
-        'performances': {
-            time.replace('.', '_'): {'key': 'value'}
-        }
+        'performances': [performance_id]
     })
 
     issue_labels_collection.insert_one({
@@ -34,12 +35,12 @@ def setup_db():
     })
     issue_labels_collection.create_index(f'predictions.{model_id}-{version_id}.existence.confidence')
 
-    return model_id, version_id, time
+    return model_id, version_id, performance_id, time
 
 
 def test_get_all_models():
     restore_dbs()
-    model_id, version_id, time = setup_db()
+    model_id, version_id, _, time = setup_db()
 
     assert client.get('/models').json() == {'models': [{
         'model_id': str(model_id),
@@ -64,7 +65,7 @@ def test_create_model():
         'name': '',
         'config': {'key': 'value'},
         'versions': [],
-        'performances': {}
+        'performances': []
     }
 
     # Create model with name
@@ -75,7 +76,7 @@ def test_create_model():
         'name': 'model_name',
         'config': {'key': 'value'},
         'versions': [],
-        'performances': {}
+        'performances': []
     }
 
     restore_dbs()
@@ -83,7 +84,7 @@ def test_create_model():
 
 def test_get_model():
     restore_dbs()
-    model_id, version_id, time = setup_db()
+    model_id, version_id, _, time = setup_db()
 
     # Get model
     assert client.get(f'/models/{model_id}').json() == {
@@ -101,7 +102,7 @@ def test_get_model():
 def test_update_model():
     restore_dbs()
     setup_users_db()
-    model_id, version_id, time = setup_db()
+    model_id, version_id, _, time = setup_db()
 
     auth_test_post(f'/models/{model_id}')
     headers = get_auth_header()
@@ -124,7 +125,7 @@ def test_update_model():
 def test_delete_model():
     restore_dbs()
     setup_users_db()
-    model_id, version_id, time = setup_db()
+    model_id, version_id, _, time = setup_db()
 
     auth_test_delete(f'/models/{model_id}')
     headers = get_auth_header()
@@ -143,7 +144,7 @@ def test_delete_model():
 def test_create_model_version():
     restore_dbs()
     setup_users_db()
-    model_id, _, _ = setup_db()
+    model_id, _, _, _ = setup_db()
 
     auth_test_post(f'/models/{model_id}/versions')
     headers = get_auth_header()
@@ -163,7 +164,7 @@ def test_create_model_version():
 
 def test_get_model_versions():
     restore_dbs()
-    model_id, version_id, time = setup_db()
+    model_id, version_id, _, time = setup_db()
 
     # Get version
     assert client.get(f'/models/{model_id}/versions').json() == {
@@ -178,7 +179,7 @@ def test_get_model_versions():
 
 def test_get_model_version():
     restore_dbs()
-    model_id, version_id, time = setup_db()
+    model_id, version_id, _, time = setup_db()
 
     # Get version
     assert client.get(f'/models/{model_id}/versions/{version_id}').content == bytes('mock data', 'utf-8')
@@ -192,7 +193,7 @@ def test_get_model_version():
 def test_delete_model_version():
     restore_dbs()
     setup_users_db()
-    model_id, version_id, time = setup_db()
+    model_id, version_id, _, time = setup_db()
 
     auth_test_delete(f'/models/{model_id}/versions/{version_id}')
     headers = get_auth_header()
@@ -211,7 +212,7 @@ def test_delete_model_version():
 def test_post_predictions():
     restore_dbs()
     setup_users_db()
-    model_id, version_id, time = setup_db()
+    model_id, version_id, _, time = setup_db()
 
     auth_test_post(f'/models/{model_id}/versions/{version_id}/predictions')
     headers = get_auth_header()
@@ -262,7 +263,7 @@ def test_post_predictions():
 
 def test_get_predictions():
     restore_dbs()
-    model_id, version_id, time = setup_db()
+    model_id, version_id, _, time = setup_db()
 
     # Get predictions
     desired_result = GetPredictionsOut(predictions={
@@ -285,7 +286,7 @@ def test_get_predictions():
 def test_delete_predictions():
     restore_dbs()
     setup_users_db()
-    model_id, version_id, time = setup_db()
+    model_id, version_id, _, time = setup_db()
 
     auth_test_delete(f'/models/{model_id}/versions/{version_id}/predictions')
     headers = get_auth_header()
@@ -303,16 +304,19 @@ def test_delete_predictions():
 def test_post_performance():
     restore_dbs()
     setup_users_db()
-    model_id, version_id, _ = setup_db()
+    model_id, version_id, _, _ = setup_db()
 
     auth_test_post(f'/models/{model_id}/performances')
     headers = get_auth_header()
 
     # Post performance
-    time = datetime.datetime.utcnow().isoformat()
-    payload = {'time': time, 'performance': [{'key': 'value'}]}
-    assert client.post(f'/models/{model_id}/performances', headers=headers, json=payload).status_code == 200
-    assert models_collection.find_one({'_id': model_id})['performances'][time.replace(".", "_")] == [{'key': 'value'}]
+    payload = {'performance': [{'key': 'value'}]}
+    performance_id = client.post(
+        f'/models/{model_id}/performances', headers=headers, json=payload
+    ).json()['performance_id']
+    assert ObjectId(performance_id) in models_collection.find_one({'_id': model_id})['performances']
+    file = fs.get(ObjectId(performance_id)).read()
+    assert json.loads(file.decode('utf-8')) == [{'key': 'value'}]
 
     # Non-existing model
     assert client.post(f'/models/{ObjectId()}/performances', headers=headers, json=payload).status_code == 404
@@ -322,10 +326,10 @@ def test_post_performance():
 
 def test_get_performances():
     restore_dbs()
-    model_id, version_id, time = setup_db()
+    model_id, version_id, performance_id, time = setup_db()
 
     # Get performance
-    desired_result = {'performances': [time]}
+    desired_result = {'performances': [str(performance_id)]}
     assert client.get(f'/models/{model_id}/performances').json() == desired_result
 
     restore_dbs()
@@ -333,11 +337,15 @@ def test_get_performances():
 
 def test_get_performance():
     restore_dbs()
-    model_id, version_id, time = setup_db()
+    model_id, version_id, performance_id, time = setup_db()
 
     # Get performance
-    desired_result = {'performance_time': time, 'performance': {'key': 'value'}}
-    assert client.get(f'/models/{model_id}/performances/{time}').json() == desired_result
+    desired_result = {'performance_id': str(performance_id), 'performance': [{'key': 'value'}]}
+    assert client.get(f'/models/{model_id}/performances/{performance_id}').json() == desired_result
+
+    # Performance not found
+    assert client.get(f'/models/{model_id}/performances/{ObjectId()}').status_code == 404
+    assert client.get(f'/models/{model_id}/performances/non-existing').status_code == 422
 
     restore_dbs()
 
@@ -345,19 +353,21 @@ def test_get_performance():
 def test_delete_performance():
     restore_dbs()
     setup_users_db()
-    model_id, version_id, time = setup_db()
+    model_id, version_id, performance_id, time = setup_db()
 
-    auth_test_delete(f'/models/{model_id}/performances/{time}')
+    auth_test_delete(f'/models/{model_id}/performances/{performance_id}')
     headers = get_auth_header()
 
     # Delete version
-    assert client.delete(f'/models/{model_id}/performances/{time}', headers=headers).status_code == 200
-    assert models_collection.find_one({'_id': model_id})['performances'] == {}
+    assert client.delete(f'/models/{model_id}/performances/{performance_id}', headers=headers).status_code == 200
+    assert models_collection.find_one({'_id': model_id})['performances'] == []
+    assert not fs.exists(performance_id)
 
     # Non-existing model
-    assert client.delete(f'/models/{ObjectId()}/performances/{time}', headers=headers).status_code == 404
+    assert client.delete(f'/models/{ObjectId()}/performances/{performance_id}', headers=headers).status_code == 404
 
     # Non-existing performance
-    assert client.delete(f'/models/{model_id}/performances/non-existing', headers=headers).status_code == 404
+    assert client.delete(f'/models/{model_id}/performances/non-existing', headers=headers).status_code == 422
+    assert client.delete(f'/models/{model_id}/performances/{ObjectId()}', headers=headers).status_code == 404
 
     restore_dbs()
