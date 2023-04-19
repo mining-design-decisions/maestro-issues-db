@@ -74,6 +74,11 @@ def auth_test_patch(endpoint: str, payload=None):
     assert response.status_code == 401
 
 
+def auth_test_put(endpoint: str, payload=None):
+    response = client.put(endpoint, json=payload)
+    assert response.status_code == 401
+
+
 def auth_test_delete(endpoint: str):
     response = client.delete(endpoint)
     assert response.status_code == 401

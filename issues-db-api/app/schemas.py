@@ -17,31 +17,31 @@ dl_models_collection_schema = {
                 "description": "'config' must be an object"
             },
             "versions": {
-                "bsonType": "array",
-                "description": "'versions' must be an array",
-                "items": {
-                    "bsonType": ["object", "null"],
-                    "description": "'version' must be an object",
-                    "additionalProperties": False,
-                    "required": ["id", "time"],
+                "bsonType": "object",
+                "description": "'versions' must be an object",
+                "additionalProperties": {
+                    "bsonType": "object",
+                    "required": ["description"],
                     "properties": {
-                        "id": {
-                            "bsonType": "objectId",
-                            "description": "'version_id' must be an objectId"
-                        },
-                        "time": {
+                        "description": {
                             "bsonType": "string",
-                            "description": "'version_time' must be a string"
+                            "description": "'description' must be a string"
                         }
                     }
                 }
             },
             "performances": {
-                "bsonType": "array",
-                "description": "'performances' must be a list",
-                "items": {
-                    "bsonType": "objectId",
-                    "description": "'performance' must be an objectId"
+                "bsonType": "object",
+                "description": "'performances' must be an object",
+                "additionalProperties": {
+                    "bsonType": "object",
+                    "required": ["description"],
+                    "properties": {
+                        "description": {
+                            "bsonType": "string",
+                            "description": "'description' must be a string"
+                        }
+                    }
                 }
             }
         }
