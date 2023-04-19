@@ -104,7 +104,7 @@ def get_ui_data(request: Query):
         db_model = models_collection.find_one({'_id': ObjectId(model_id)})
         if db_model is None:
             raise model_not_found_exception(model_id)
-        if ObjectId(version_id) not in [version['id'] for version in db_model['versions']]:
+        if version_id not in db_model['versions']:
             raise version_not_found_exception(version_id, model_id)
 
     if request.sort is not None:

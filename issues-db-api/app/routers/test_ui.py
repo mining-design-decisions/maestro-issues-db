@@ -113,7 +113,7 @@ def test_ui():
         '_id': model_id,
         'name': 'model_name',
         'config': {'key': 'value'},
-        'versions': [],
+        'versions': {},
         'performances': {}
     })
 
@@ -132,7 +132,7 @@ def test_ui():
     # Insert version
     models_collection.update_one(
         {'_id': model_id},
-        {'$set': {'versions': [{'id': version_id, 'time': 'version-time'}]}}
+        {'$set': {'versions': {str(version_id): {'description': 'version description'}}}}
     )
 
     response_issue1 = {
