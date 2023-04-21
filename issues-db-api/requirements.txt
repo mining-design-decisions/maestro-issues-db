@@ -9,4 +9,3 @@ passlib[bcrypt]
 pytest
 httpx
 coverage
-kafka-python
