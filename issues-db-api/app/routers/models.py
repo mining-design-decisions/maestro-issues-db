@@ -1,41 +1,24 @@
-import typing
-from fastapi import APIRouter, UploadFile, Response, Form, Depends, HTTPException
-from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
-from app.dependencies import fs, models_collection, issue_labels_collection
-from app.routers.authentication import validate_token
-from bson import ObjectId
-from app.util import read_file_in_chunks
-from app.exceptions import model_not_found_exception, version_not_found_exception, performance_not_found_exception,\
-    issue_not_found_exception, bson_exception
 import io
 import json
+import typing
+
 import bson
-
-router = APIRouter(
-    prefix='/models',
-    tags=['models']
+from app.dependencies import fs, models_collection, issue_labels_collection
+from app.exceptions import (
+    model_not_found_exception,
+    version_not_found_exception,
+    performance_not_found_exception,
+    issue_not_found_exception,
+    bson_exception,
 )
+from app.routers.authentication import validate_token
+from app.util import read_file_in_chunks
+from bson import ObjectId
+from fastapi import APIRouter, UploadFile, Form, Depends, HTTPException
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
-
-class SavePredictionsIn(BaseModel):
-    model_id: str
-    predictions: dict[str, dict[str, dict[str, typing.Any]]]
-
-    class Config:
-        schema_extra = {
-            "example": {
-                'model_id': 'model_id',
-                'predictions': {
-                    'issue_id': {
-                        "existence": {
-                            "prediction": True,
-                            "confidence": 0.42
-                        }
-                    }
-                }
-            }
-        }
+router = APIRouter(prefix="/models", tags=["models"])
 
 
 class PostModelIn(BaseModel):
@@ -86,7 +69,7 @@ class PerformancesOut(BaseModel):
     class Config:
         schema_extra = {
             "example": {
-                'performances': [{'performance_id': 'string', 'description': 'string'}]
+                "performances": [{"performance_id": "string", "description": "string"}]
             }
         }
 
@@ -97,19 +80,19 @@ class PerformanceOut(BaseModel):
     performance: list
 
 
+class Prediction(BaseModel):
+    prediction: bool
+    confidence: float
+
+
 class PostPredictionsIn(BaseModel):
-    predictions: dict[str, dict[str, dict[str, typing.Any]]]
+    predictions: dict[str, dict[str, Prediction]]
 
     class Config:
         schema_extra = {
             "example": {
-                'predictions': {
-                    'issue_id': {
-                        "existence": {
-                            "prediction": True,
-                            "confidence": 0.42
-                        }
-                    }
+                "predictions": {
+                    "issue_id": {"existence": {"prediction": True, "confidence": 0.42}}
                 }
             }
         }
@@ -125,13 +108,8 @@ class GetPredictionsOut(BaseModel):
     class Config:
         schema_extra = {
             "example": {
-                'predictions': {
-                    'issue_id': {
-                        "existence": {
-                            "prediction": True,
-                            "confidence": 0.42
-                        }
-                    }
+                "predictions": {
+                    "issue_id": {"existence": {"prediction": True, "confidence": 0.42}}
                 }
             }
         }
@@ -155,38 +133,28 @@ class UpdateDescriptionIn(BaseModel):
 
 
 def _get_model(model_id: str, attributes: list[str]):
-    model = models_collection.find_one(
-        {'_id': ObjectId(model_id)},
-        attributes
-    )
+    model = models_collection.find_one({"_id": ObjectId(model_id)}, attributes)
     if model is None:
         raise model_not_found_exception(model_id)
     return model
 
 
 def _update_model(model_id: str, update: dict):
-    result = models_collection.update_one(
-        {'_id': ObjectId(model_id)},
-        update
-    )
+    result = models_collection.update_one({"_id": ObjectId(model_id)}, update)
     if result.matched_count == 0:
-        raise HTTPException(
-            status_code=404,
-            detail=f'Model "{model_id}" was not found'
-        )
+        raise HTTPException(status_code=404, detail=f'Model "{model_id}" was not found')
 
 
 def _delete_predictions(model_id: str, version_id: ObjectId):
     # Remove predictions
     issue_labels_collection.update_many(
-        {},
-        {'$unset': {f'predictions.{model_id}-{version_id}': ""}}
+        {}, {"$unset": {f"predictions.{model_id}-{version_id}": ""}}
     )
     # Remove indexes
     indexes = issue_labels_collection.index_information()
     for key, value in indexes.items():
-        for col in value['key']:
-            if f'predictions.{model_id}-{version_id}' in col[0]:
+        for col in value["key"]:
+            if f"predictions.{model_id}-{version_id}" in col[0]:
                 issue_labels_collection.drop_index(key)
                 break
 
@@ -197,85 +165,85 @@ def _delete_version(model_id: str, version_id: ObjectId):
     _delete_predictions(model_id, version_id)
 
 
-@router.get('', response_model=GetModelsOut)
+@router.get("", response_model=GetModelsOut)
 def get_all_models():
     """
     Returns a list of all models in the database.
     """
-    models = models_collection.find({}, ['name'])
+    models = models_collection.find({}, ["name"])
     response = []
     for model in models:
-        response.append(SimpleModelOut(model_id=str(model['_id']), model_name=model['name']))
+        response.append(
+            SimpleModelOut(model_id=str(model["_id"]), model_name=model["name"])
+        )
     return GetModelsOut(models=response)
 
 
-@router.post('', response_model=PostModelOut)
+@router.post("", response_model=PostModelOut)
 def create_model(request: PostModelIn, token=Depends(validate_token)):
     """
     Creates a new model entry with the given config.
     """
-    _id = models_collection.insert_one({
-        'name': '' if request.model_name is None else request.model_name,
-        'config': request.model_config,
-        'versions': {},
-        'performances': {}
-    }).inserted_id
+    _id = models_collection.insert_one(
+        {
+            "name": "" if request.model_name is None else request.model_name,
+            "config": request.model_config,
+            "versions": {},
+            "performances": {},
+        }
+    ).inserted_id
     return PostModelOut(model_id=str(_id))
 
 
-@router.get('/{model_id}', response_model=GetModelOut)
+@router.get("/{model_id}", response_model=GetModelOut)
 def get_model(model_id: str):
     """
     Return the model with the specified model id.
     """
-    model = _get_model(model_id, ['name', 'config'])
+    model = _get_model(model_id, ["name", "config"])
     return GetModelOut(
-        model_id=model_id,
-        model_name=model['name'],
-        model_config=model['config']
+        model_id=model_id, model_name=model["name"], model_config=model["config"]
     )
 
 
-@router.post('/{model_id}')
+@router.post("/{model_id}")
 def update_model(model_id: str, request: UpdateModelIn, token=Depends(validate_token)):
     """
     Update the name and/or config of the model with model_id.
     """
     updated_info = dict()
     if request.model_name is not None:
-        updated_info['name'] = request.model_name
+        updated_info["name"] = request.model_name
     if request.model_config is not None:
-        updated_info['config'] = request.model_config
-    _update_model(model_id, {'$set': updated_info})
+        updated_info["config"] = request.model_config
+    _update_model(model_id, {"$set": updated_info})
 
 
-@router.delete('/{model_id}')
+@router.delete("/{model_id}")
 def delete_model(model_id: str, token=Depends(validate_token)):
-    model = models_collection.find_one({'_id': ObjectId(model_id)})
+    model = models_collection.find_one({"_id": ObjectId(model_id)})
     if model is None:
         raise model_not_found_exception(model_id)
 
     # Delete versions and their predictions
-    for version_id in model['versions']:
+    for version_id in model["versions"]:
         _delete_version(model_id, ObjectId(version_id))
 
     # Delete the model itself, including performances
-    models_collection.delete_one({'_id': ObjectId(model_id)})
+    models_collection.delete_one({"_id": ObjectId(model_id)})
 
 
-@router.post('/{model_id}/versions', response_model=VersionIdOut)
+@router.post("/{model_id}/versions", response_model=VersionIdOut)
 def create_model_version(
-        model_id: str,
-        file: UploadFile = Form(),
-        token=Depends(validate_token)
+    model_id: str, file: UploadFile = Form(), token=Depends(validate_token)
 ):
     """
     Upload a new version for the given model-id.
     """
     version_id = fs.put(file.file, filename=file.filename)
     result = models_collection.update_one(
-        {'_id': ObjectId(model_id)},
-        {'$set': {f'versions.{version_id}': {'description': ''}}}
+        {"_id": ObjectId(model_id)},
+        {"$set": {f"versions.{version_id}": {"description": ""}}},
     )
     if result.matched_count == 0:
         fs.delete(version_id)
@@ -283,37 +251,39 @@ def create_model_version(
     return VersionIdOut(version_id=str(version_id))
 
 
-@router.get('/{model_id}/versions', response_model=VersionsOut)
+@router.get("/{model_id}/versions", response_model=VersionsOut)
 def get_model_versions(model_id: str):
     """
     Get the model versions for the specified model.
     """
-    model = _get_model(model_id, ['versions'])
+    model = _get_model(model_id, ["versions"])
     versions = []
-    for version_id, version in model['versions'].items():
-        versions.append(VersionOut(version_id=version_id, description=version['description']))
+    for version_id, version in model["versions"].items():
+        versions.append(
+            VersionOut(version_id=version_id, description=version["description"])
+        )
     return VersionsOut(versions=versions)
 
 
-@router.get('/{model_id}/versions/{version_id}')
+@router.get("/{model_id}/versions/{version_id}")
 def get_model_version(model_id: str, version_id: str):
     """
     Get the binary file for the given model version.
     """
-    model = _get_model(model_id, ['versions'])
-    for version_id_ in model['versions']:
+    model = _get_model(model_id, ["versions"])
+    for version_id_ in model["versions"]:
         if version_id == version_id_:
             mongo_file = fs.get(ObjectId(version_id_))
-            return StreamingResponse(read_file_in_chunks(mongo_file),
-                                     media_type='application/octet-stream')
+            return StreamingResponse(
+                read_file_in_chunks(mongo_file), media_type="application/octet-stream"
+            )
     raise version_not_found_exception(version_id, model_id)
 
 
-@router.delete('/{model_id}/versions/{version_id}')
+@router.delete("/{model_id}/versions/{version_id}")
 def delete_model_version(model_id: str, version_id: str, token=Depends(validate_token)):
     result = models_collection.update_one(
-        {'_id': ObjectId(model_id)},
-        {'$unset': {f'versions.{version_id}': ''}}
+        {"_id": ObjectId(model_id)}, {"$unset": {f"versions.{version_id}": ""}}
     )
     if result.matched_count == 0:
         raise model_not_found_exception(model_id)
@@ -322,32 +292,34 @@ def delete_model_version(model_id: str, version_id: str, token=Depends(validate_
     _delete_version(model_id, ObjectId(version_id))
 
 
-@router.put('/{model_id}/versions/{version_id}/description')
-def update_version_description(model_id: str,
-                               version_id: str,
-                               request: UpdateDescriptionIn,
-                               token=Depends(validate_token)):
+@router.put("/{model_id}/versions/{version_id}/description")
+def update_version_description(
+    model_id: str,
+    version_id: str,
+    request: UpdateDescriptionIn,
+    token=Depends(validate_token),
+):
     result = models_collection.update_one(
-        {'_id': ObjectId(model_id), f'versions.{version_id}': {'$exists': True}},
-        {'$set': {f'versions.{version_id}': {'description': request.description}}}
+        {"_id": ObjectId(model_id), f"versions.{version_id}": {"$exists": True}},
+        {"$set": {f"versions.{version_id}": {"description": request.description}}},
     )
     if result.matched_count == 0:
         raise version_not_found_exception(version_id, model_id)
 
 
-@router.post('/{model_id}/versions/{version_id}/predictions')
+@router.post("/{model_id}/versions/{version_id}/predictions")
 def post_predictions(
-        model_id: str,
-        version_id: str,
-        request: PostPredictionsIn,
-        token=Depends(validate_token)
+    model_id: str,
+    version_id: str,
+    request: PostPredictionsIn,
+    token=Depends(validate_token),
 ):
     """
     Saves the predictions of the specified model version in the database.
     """
     # Make sure the version of the model exists
-    model = _get_model(model_id, ['versions'])
-    if version_id not in model['versions']:
+    model = _get_model(model_id, ["versions"])
+    if version_id not in model["versions"]:
         raise version_not_found_exception(version_id, model_id)
     classes = set()
     for issue_id, predicted_classes in request.predictions.items():
@@ -356,37 +328,43 @@ def post_predictions(
             predictions[predicted_class] = predicted_classes[predicted_class]
             classes.add(predicted_class)
         result = issue_labels_collection.update_one(
-            {'_id': issue_id},
-            {'$set': {
-                'predictions': {f'{model_id}-{version_id}': predictions}
-            }}
+            {"_id": issue_id},
+            {"$set": {"predictions": {f"{model_id}-{version_id}": predictions}}},
         )
         if result.matched_count != 1:
             raise issue_not_found_exception(issue_id)
     for class_ in classes:
         # Make sure the predictions are indexed for speed
-        issue_labels_collection.create_index(f'predictions.{model_id}-{version_id}.{class_}.confidence')
+        issue_labels_collection.create_index(
+            f"predictions.{model_id}-{version_id}.{class_}.confidence"
+        )
 
 
-@router.get('/{model_id}/versions/{version_id}/predictions', response_model=GetPredictionsOut)
+@router.get(
+    "/{model_id}/versions/{version_id}/predictions", response_model=GetPredictionsOut
+)
 def get_predictions(model_id: str, version_id: str, request: GetPredictionsIn):
     """
     Returns the predicted labels of the specified model version. Set issue_ids to null to get all predictions.
     """
     if request.issue_ids is None:
-        filter_ = {f'predictions.{model_id}-{version_id}': {'$exists': True}}
+        filter_ = {f"predictions.{model_id}-{version_id}": {"$exists": True}}
     else:
-        filter_ = {'$and': [
-            {'_id': {'$in': request.issue_ids}},
-            {f'predictions.{model_id}-{version_id}': {'$exists': True}}
-        ]}
-    issues = issue_labels_collection.find(filter_, [f'predictions.{model_id}-{version_id}'])
+        filter_ = {
+            "$and": [
+                {"_id": {"$in": request.issue_ids}},
+                {f"predictions.{model_id}-{version_id}": {"$exists": True}},
+            ]
+        }
+    issues = issue_labels_collection.find(
+        filter_, [f"predictions.{model_id}-{version_id}"]
+    )
     predictions = dict()
     if request.issue_ids is not None:
         remaining_ids = set(request.issue_ids)
     for issue in issues:
-        issue_id = issue.pop('_id')
-        predictions[issue_id] = issue['predictions'][f'{model_id}-{version_id}']
+        issue_id = issue.pop("_id")
+        predictions[issue_id] = issue["predictions"][f"{model_id}-{version_id}"]
         if request.issue_ids is not None:
             remaining_ids.remove(issue_id)
     if request.issue_ids is not None:
@@ -395,75 +373,76 @@ def get_predictions(model_id: str, version_id: str, request: GetPredictionsIn):
     return GetPredictionsOut(predictions=predictions)
 
 
-@router.delete('/{model_id}/versions/{version_id}/predictions')
+@router.delete("/{model_id}/versions/{version_id}/predictions")
 def delete_predictions(model_id: str, version_id: str, token=Depends(validate_token)):
-    model = _get_model(model_id, ['versions'])
-    if version_id not in model['versions']:
+    model = _get_model(model_id, ["versions"])
+    if version_id not in model["versions"]:
         raise version_not_found_exception(version_id, model_id)
     _delete_version(model_id, ObjectId(version_id))
 
 
-@router.post('/{model_id}/performances', response_model=PostPerformanceOut)
+@router.post("/{model_id}/performances", response_model=PostPerformanceOut)
 def post_performance(
-        model_id: str,
-        request: PostPerformanceIn,
-        token=Depends(validate_token)
+    model_id: str, request: PostPerformanceIn, token=Depends(validate_token)
 ):
     """
     Add a performance result for the given model.
     """
-    file = io.BytesIO(bytes(json.dumps(request.performance), 'utf-8'))
-    file_id = fs.put(file, filename='performance.json')
+    file = io.BytesIO(bytes(json.dumps(request.performance), "utf-8"))
+    file_id = fs.put(file, filename="performance.json")
     result = models_collection.update_one(
-        {'_id': ObjectId(model_id)},
-        {'$set': {f'performances.{file_id}': {'description': ''}}}
+        {"_id": ObjectId(model_id)},
+        {"$set": {f"performances.{file_id}": {"description": ""}}},
     )
     if result.matched_count == 0:
         raise model_not_found_exception(model_id)
     return PostPerformanceOut(performance_id=str(file_id))
 
 
-@router.get('/{model_id}/performances', response_model=PerformancesOut)
+@router.get("/{model_id}/performances", response_model=PerformancesOut)
 def get_performances(model_id: str):
     """
     Get a list of all performance results for the given model.
     """
-    model = _get_model(model_id, ['performances'])
+    model = _get_model(model_id, ["performances"])
     performances = []
-    for performance_id, performance in model['performances'].items():
-        performances.append(PerformanceDescriptionOut(
-            performance_id=performance_id,
-            description=performance['description']
-        ))
+    for performance_id, performance in model["performances"].items():
+        performances.append(
+            PerformanceDescriptionOut(
+                performance_id=performance_id, description=performance["description"]
+            )
+        )
     return PerformancesOut(performances=performances)
 
 
-@router.get('/{model_id}/performances/{performance_id}', response_model=PerformanceOut)
+@router.get("/{model_id}/performances/{performance_id}", response_model=PerformanceOut)
 def get_performance(model_id: str, performance_id: str):
     """
     Get the requested performance result.
     """
-    model = _get_model(model_id, ['performances'])
+    model = _get_model(model_id, ["performances"])
     try:
         ObjectId(performance_id)
     except bson.errors.BSONError as e:
         raise bson_exception(str(e))
-    if performance_id not in model['performances']:
+    if performance_id not in model["performances"]:
         raise performance_not_found_exception(performance_id, model_id)
     file = fs.get(ObjectId(performance_id))
     return PerformanceOut(
         performance_id=performance_id,
-        description=model['performances'][performance_id]['description'],
-        performance=json.loads(file.read().decode('utf-8'))
+        description=model["performances"][performance_id]["description"],
+        performance=json.loads(file.read().decode("utf-8")),
     )
 
 
-@router.delete('/{model_id}/performances/{performance_id}')
-def delete_performance(model_id: str, performance_id: str, token=Depends(validate_token)):
+@router.delete("/{model_id}/performances/{performance_id}")
+def delete_performance(
+    model_id: str, performance_id: str, token=Depends(validate_token)
+):
     try:
         result = models_collection.update_one(
-            {'_id': ObjectId(model_id)},
-            {'$unset': {f'performances.{performance_id}': ''}}
+            {"_id": ObjectId(model_id)},
+            {"$unset": {f"performances.{performance_id}": ""}},
         )
     except bson.errors.BSONError as e:
         raise bson_exception(str(e))
@@ -474,14 +453,23 @@ def delete_performance(model_id: str, performance_id: str, token=Depends(validat
     fs.delete(ObjectId(performance_id))
 
 
-@router.put('/{model_id}/performances/{performance_id}/description')
-def update_performance_description(model_id: str,
-                                   performance_id: str,
-                                   request: UpdateDescriptionIn,
-                                   token=Depends(validate_token)):
+@router.put("/{model_id}/performances/{performance_id}/description")
+def update_performance_description(
+    model_id: str,
+    performance_id: str,
+    request: UpdateDescriptionIn,
+    token=Depends(validate_token),
+):
     result = models_collection.update_one(
-        {'_id': ObjectId(model_id), f'performances.{performance_id}': {'$exists': True}},
-        {'$set': {f'performances.{performance_id}': {'description': request.description}}}
+        {
+            "_id": ObjectId(model_id),
+            f"performances.{performance_id}": {"$exists": True},
+        },
+        {
+            "$set": {
+                f"performances.{performance_id}": {"description": request.description}
+            }
+        },
     )
     if result.matched_count == 0:
         raise performance_not_found_exception(performance_id, model_id)
