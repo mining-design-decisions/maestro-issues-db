@@ -103,7 +103,7 @@ class GetPredictionsIn(BaseModel):
 
 
 class GetPredictionsOut(BaseModel):
-    predictions: dict[str, dict[str, dict[str, typing.Any]] | None]
+    predictions: dict[str, dict[str, Prediction] | None]
 
     class Config:
         schema_extra = {
