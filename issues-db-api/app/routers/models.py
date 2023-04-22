@@ -325,7 +325,10 @@ def post_predictions(
     for issue_id, predicted_classes in request.predictions.items():
         predictions = {}
         for predicted_class in predicted_classes:
-            predictions[predicted_class] = predicted_classes[predicted_class]
+            predictions[predicted_class] = {
+                "prediction": predicted_classes[predicted_class].prediction,
+                "confidence": predicted_classes[predicted_class].confidence,
+            }
             classes.add(predicted_class)
         result = issue_labels_collection.update_one(
             {"_id": issue_id},
