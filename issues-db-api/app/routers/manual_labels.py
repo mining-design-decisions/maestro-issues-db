@@ -124,6 +124,7 @@ def update_manual_label(issue_id: str, request: Label, token=Depends(validate_to
     if result.matched_count == 0:
         raise issue_not_found_exception(issue_id)
     ui_updates.send_ui_update_manual_label(issue_id)
+    ui_updates.send_ui_update_tags(issue_id)
 
 
 @router.get("/{issue_id}/comments", response_model=CommentsOut)
@@ -164,6 +165,7 @@ def add_comment(issue_id: str, request: CommentIn, token=Depends(validate_token)
         },
     )
     ui_updates.send_ui_update_comments(issue_id)
+    ui_updates.send_ui_update_tags(issue_id)
     return CommentIdOut(comment_id=str(comment_id))
 
 
