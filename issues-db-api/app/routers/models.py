@@ -354,7 +354,8 @@ def post_predictions(
 @router.get("/{model_id}/versions/{version_id}/predictions")
 def get_predictions(model_id: str, version_id: str, request: GetPredictionsIn):
     """
-    Returns the predicted labels of the specified model version. Set issue_ids to null to get all predictions.
+    Returns the predicted labels of the specified model version. Set issue_ids to null
+    to get all predictions. It returns the predictions as a byte stream.
     """
     if request.issue_ids is None:
         filter_ = {f"predictions.{model_id}-{version_id}": {"$exists": True}}
@@ -398,7 +399,8 @@ def post_performance(
     model_id: str, file: UploadFile = Form(), token=Depends(validate_token)
 ):
     """
-    Add a performance result for the given model.
+    Add a performance result for the given model. The performances should be uploaded
+    as a bytes file.
     """
     file_id = fs.put(file.file, filename=file.filename)
     result = models_collection.update_one(
@@ -429,7 +431,7 @@ def get_performances(model_id: str):
 @router.get("/{model_id}/performances/{performance_id}", response_model=PerformanceOut)
 def get_performance(model_id: str, performance_id: str):
     """
-    Get the requested performance result.
+    Get the requested performance result. It returns the performance as a byte stream.
     """
     model = _get_model(model_id, ["performances"])
     try:
