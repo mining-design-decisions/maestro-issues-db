@@ -311,23 +311,31 @@ def update_version_description(
 def post_predictions(
     model_id: str,
     version_id: str,
-    request: PostPredictionsIn,
+    file: UploadFile = Form(),
     token=Depends(validate_token),
 ):
     """
-    Saves the predictions of the specified model version in the database.
+    Saves the predictions of the specified model version in the database. Predictions
+    should have the following format:
+    {
+        "predictions": {
+            "issue_id": {"existence": {"prediction": True, "confidence": 0.42}}
+        }
+    }
     """
     # Make sure the version of the model exists
     model = _get_model(model_id, ["versions"])
     if version_id not in model["versions"]:
         raise version_not_found_exception(version_id, model_id)
+    # Convert file to json
+    predictions = json.loads(file.file.read().decode("utf-8"))["predictions"]
     classes = set()
-    for issue_id, predicted_classes in request.predictions.items():
+    for issue_id, predicted_classes in predictions.items():
         predictions = {}
         for predicted_class in predicted_classes:
             predictions[predicted_class] = {
-                "prediction": predicted_classes[predicted_class].prediction,
-                "confidence": predicted_classes[predicted_class].confidence,
+                "prediction": predicted_classes[predicted_class]["prediction"],
+                "confidence": predicted_classes[predicted_class]["confidence"],
             }
             classes.add(predicted_class)
         result = issue_labels_collection.update_one(
@@ -343,9 +351,7 @@ def post_predictions(
         )
 
 
-@router.get(
-    "/{model_id}/versions/{version_id}/predictions", response_model=GetPredictionsOut
-)
+@router.get("/{model_id}/versions/{version_id}/predictions")
 def get_predictions(model_id: str, version_id: str, request: GetPredictionsIn):
     """
     Returns the predicted labels of the specified model version. Set issue_ids to null to get all predictions.
@@ -373,7 +379,10 @@ def get_predictions(model_id: str, version_id: str, request: GetPredictionsIn):
     if request.issue_ids is not None:
         for issue_id in remaining_ids:
             predictions[issue_id] = None
-    return GetPredictionsOut(predictions=predictions)
+    file = io.BytesIO(bytes(json.dumps({"predictions": predictions}), "utf-8"))
+    return StreamingResponse(
+        read_file_in_chunks(file), media_type="application/octet-stream"
+    )
 
 
 @router.delete("/{model_id}/versions/{version_id}/predictions")
@@ -386,13 +395,12 @@ def delete_predictions(model_id: str, version_id: str, token=Depends(validate_to
 
 @router.post("/{model_id}/performances", response_model=PostPerformanceOut)
 def post_performance(
-    model_id: str, request: PostPerformanceIn, token=Depends(validate_token)
+    model_id: str, file: UploadFile = Form(), token=Depends(validate_token)
 ):
     """
     Add a performance result for the given model.
     """
-    file = io.BytesIO(bytes(json.dumps(request.performance), "utf-8"))
-    file_id = fs.put(file, filename="performance.json")
+    file_id = fs.put(file.file, filename=file.filename)
     result = models_collection.update_one(
         {"_id": ObjectId(model_id)},
         {"$set": {f"performances.{file_id}": {"description": ""}}},
@@ -431,10 +439,14 @@ def get_performance(model_id: str, performance_id: str):
     if performance_id not in model["performances"]:
         raise performance_not_found_exception(performance_id, model_id)
     file = fs.get(ObjectId(performance_id))
-    return PerformanceOut(
-        performance_id=performance_id,
-        description=model["performances"][performance_id]["description"],
-        performance=json.loads(file.read().decode("utf-8")),
+    payload = {
+        "performance_id": performance_id,
+        "description": model["performances"][performance_id]["description"],
+        "performance": json.loads(file.read().decode("utf-8")),
+    }
+    file = io.BytesIO(bytes(json.dumps(payload), "utf-8"))
+    return StreamingResponse(
+        read_file_in_chunks(file), media_type="application/octet-stream"
     )
 
 
