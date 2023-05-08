@@ -340,7 +340,7 @@ def post_predictions(
             classes.add(predicted_class)
         result = issue_labels_collection.update_one(
             {"_id": issue_id},
-            {"$set": {"predictions": {f"{model_id}-{version_id}": predictions}}},
+            {"$set": {f"predictions.{model_id}-{version_id}": predictions}},
         )
         if result.matched_count != 1:
             raise issue_not_found_exception(issue_id)
