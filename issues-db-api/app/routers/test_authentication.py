@@ -43,6 +43,22 @@ def test_authentication():
     restore_dbs()
 
 
+def test_refresh_token():
+    restore_dbs()
+    setup_users_db()
+
+    headers = get_auth_header()
+    token = client.post("/refresh-token", headers=headers).json()["access_token"]
+    # Random token
+    headers = {"Authorization": f"bearer random-token-here"}
+    assert client.post("/refresh-token", headers=headers).status_code == 401
+    # Refreshed token
+    headers = {"Authorization": f"bearer {token}"}
+    assert client.post("/refresh-token", headers=headers).status_code == 200
+
+    restore_dbs()
+
+
 def test_change_password():
     restore_dbs()
     setup_users_db()

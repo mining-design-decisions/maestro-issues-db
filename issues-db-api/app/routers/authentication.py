@@ -97,6 +97,17 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
     return {"access_token": access_token, "token_type": "bearer"}
 
 
+@router.post("/refresh-token", response_model=Token)
+def refresh_token(token=Depends(validate_token)):
+    """
+    Endpoint for refreshing your access token.
+    :param token: current access token
+    :return: refreshed token
+    """
+    access_token = create_access_token(token)
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
 @router.post("/create-account")
 def create_account(new_account: User, token=Depends(validate_token)):
     """
