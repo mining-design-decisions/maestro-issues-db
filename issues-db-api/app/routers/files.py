@@ -20,12 +20,16 @@ class FileIdOut(BaseModel):
     file_id: str
 
 
+class Category(BaseModel):
+    category: str | None
+
+
 @router.get("", response_model=list[FileOut])
-def get_files(category: str = None):
-    if category is None:
+def get_files(request: Category):
+    if request.category is None:
         files = files_collection.find()
     else:
-        files = files_collection.find({"category": category})
+        files = files_collection.find({"category": request.category})
 
     return [
         FileOut(

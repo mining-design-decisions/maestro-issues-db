@@ -3,6 +3,7 @@ import io
 from app.dependencies import files_collection, fs
 from bson import ObjectId
 
+from .files import get_files, Category
 from .test_util import (
     restore_dbs,
     client,
@@ -26,21 +27,21 @@ def test_get_files():
     restore_dbs()
     file_id = setup_db()
 
-    assert client.get("/files").json() == [
+    assert get_files(Category(category=None)) == [
         {
             "file_id": str(file_id),
             "description": "Description of file",
             "category": "cat1",
         }
     ]
-    assert client.get("/files?category=cat1").json() == [
+    assert get_files(Category(category="cat1")) == [
         {
             "file_id": str(file_id),
             "description": "Description of file",
             "category": "cat1",
         }
     ]
-    assert client.get("/files?category=cat2").json() == []
+    assert get_files(Category(category="cat2")) == []
 
     restore_dbs()
 
