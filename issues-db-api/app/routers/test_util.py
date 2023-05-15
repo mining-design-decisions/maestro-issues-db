@@ -10,6 +10,7 @@ from app.dependencies import (
     mining_add_db,
     embeddings_collection,
     mongo_client,
+    files_collection,
 )
 from app.schemas import (
     issue_labels_collection_schema,
@@ -19,6 +20,7 @@ from app.schemas import (
     dl_models_collection_schema,
     embeddings_collection_schema,
     users_collection_schema,
+    files_collection_schema,
 )
 from fastapi.testclient import TestClient
 
@@ -47,6 +49,7 @@ def restore_dbs():
     mining_add_db["fs_file"].drop()
     mining_add_db["fs_chunks"].drop()
     embeddings_collection.drop()
+    files_collection.drop()
 
     mining_add_db.create_collection(
         "IssueLabels", validator=issue_labels_collection_schema
@@ -60,6 +63,7 @@ def restore_dbs():
     mining_add_db.create_collection(
         "DLEmbeddings", validator=embeddings_collection_schema
     )
+    mining_add_db.create_collection("Files", validator=files_collection_schema)
     mongo_client["Users"].create_collection("Users", validator=users_collection_schema)
 
 

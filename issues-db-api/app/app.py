@@ -11,6 +11,7 @@ from .routers import (
     ui,
     repos,
     bulk,
+    files,
 )
 from .streaming import ui_updates
 from .config import SSL_KEYFILE, SSL_CERTFILE
@@ -21,6 +22,7 @@ app = FastAPI()
 app.include_router(authentication.router)
 app.include_router(bulk.router)
 app.include_router(embeddings.router)
+app.include_router(files.router)
 app.include_router(issue_data.router)
 app.include_router(issue_ids.router)
 app.include_router(issues.router)
