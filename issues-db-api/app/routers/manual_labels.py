@@ -109,6 +109,52 @@ def get_manual_labels(request: ManualLabelsIn):
     return ManualLabelsOut(manual_labels=labels)
 
 
+# Endpoint for retrieving the original labels
+# @router.get("", response_model=ManualLabelsOut)
+# def get_manual_labels(request: ManualLabelsIn):
+#     """
+#     Returns the manual labels of the issue ids that were
+#     provided in the request body.
+#     """
+#     issues = issue_labels_collection.find(
+#         {
+#             "$and": [
+#                 {"_id": {"$in": request.issue_ids}},
+#                 {"tags": "has-label"},
+#             ]
+#         },
+#         ["comments", "existence", "property", "executive"],
+#     )
+#
+#     # Build and send response
+#     labels = {}
+#     ids = set(request.issue_ids)
+#     for issue in issues:
+#         ids.remove(issue["_id"])
+#         label = None
+#         for _, comment in issue["comments"].items():
+#             if comment["author"] == "original label":
+#                 label = {"existence": False, "property": False, "executive": False}
+#                 if "existence" in comment["comment"].lower():
+#                     label["existence"] = True
+#                 if "property" in comment["comment"].lower():
+#                     label["property"] = True
+#                 if "executive" in comment["comment"].lower():
+#                     label["executive"] = True
+#                 labels[issue["_id"]] = label
+#                 break
+#         if label is not None:
+#             continue
+#         labels[issue["_id"]] = {
+#             "existence": issue["existence"],
+#             "property": issue["property"],
+#             "executive": issue["executive"],
+#         }
+#     if ids:
+#         raise manual_labels_not_found_exception(list(ids))
+#     return ManualLabelsOut(manual_labels=labels)
+
+
 @router.post("/{issue_id}")
 def update_manual_label(issue_id: str, request: Label, token=Depends(validate_token)):
     """
