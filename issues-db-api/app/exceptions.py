@@ -138,3 +138,37 @@ def version_not_specified_exception(model: str):
 
 def file_not_found_exception(file_id: str):
     return HTTPException(status_code=404, detail=f"File {file_id} not found")
+
+
+def repo_exists_exception(repo_name: str):
+    return HTTPException(status_code=409, detail=f"The repo {repo_name} already exists")
+
+
+def repo_not_exists_exception(repo_name: str):
+    return HTTPException(status_code=404, detail=f"The repo {repo_name} does not exist")
+
+
+def url_not_working_exception(url: str):
+    return HTTPException(status_code=502, detail=f"The url does not work: {url}")
+
+
+def wrong_date_format(date: str):
+    return HTTPException(
+        status_code=422,
+        detail=f"Date {date} should have the following format: YYYY-mm-dd",
+    )
+
+
+def wrong_batch_size(batch_size: int):
+    return HTTPException(
+        status_code=422,
+        detail=f"batch_size {batch_size} should be greater than 0",
+    )
+
+
+def wrong_wait_time(query_wait_time_minutes: float):
+    return HTTPException(
+        status_code=422,
+        detail=f"query_wait_time_minutes {query_wait_time_minutes} should be greater "
+        f"than or equal to 0.0",
+    )

@@ -11,6 +11,7 @@ from app.dependencies import (
     embeddings_collection,
     mongo_client,
     files_collection,
+    repo_info_collection,
 )
 from app.schemas import (
     issue_labels_collection_schema,
@@ -21,6 +22,7 @@ from app.schemas import (
     embeddings_collection_schema,
     users_collection_schema,
     files_collection_schema,
+    repo_info_collection_schema,
 )
 from fastapi.testclient import TestClient
 
@@ -44,6 +46,7 @@ def restore_dbs():
     models_collection.drop()
     jira_repos_db["Apache"].drop()
     issue_links_collection.drop()
+    repo_info_collection.drop()
     projects_collection.drop()
     tags_collection.drop()
     mining_add_db["fs_file"].drop()
@@ -57,6 +60,7 @@ def restore_dbs():
     mining_add_db.create_collection(
         "IssueLinks", validator=issue_links_collection_schema
     )
+    mining_add_db.create_collection("RepoInfo", validator=repo_info_collection_schema)
     mining_add_db.create_collection("Tags", validator=tags_collection_schema)
     mining_add_db.create_collection("Projects", validator=projects_collection_schema)
     mining_add_db.create_collection("DLModels", validator=dl_models_collection_schema)

@@ -5,8 +5,8 @@ docker compose up --build -d
 docker cp ./mongodump-JiraRepos_2023-03-07-16:00.archive mongo:/mongodump-JiraRepos.archive
 docker exec -i mongo mongorestore --gzip --archive=mongodump-JiraRepos.archive --nsFrom "JiraRepos.*" --nsTo "JiraRepos.*"
 
-docker cp ./mongodump-IssueLabels.archive mongo:/mongodump-IssueLabels.archive
-docker exec -i mongo mongorestore --gzip --archive=mongodump-IssueLabels.archive --nsFrom "IssueLabels.*" --nsTo "IssueLabels.*"
+docker cp ./mongodump-MiningDesignDecisions.archive mongo:/mongodump-MiningDesignDecisions.archive
+docker exec -i mongo mongorestore --gzip --archive=mongodump-MiningDesignDecisions.archive --nsFrom "MiningDesignDecisions.*" --nsTo "MiningDesignDecisions.*"
 
 python3.10 -m venv venv
 source venv/bin/activate
@@ -23,10 +23,10 @@ gdown file-id
 
 # Dump data
 
-## IssueLabels
+## MiningDesignDecisions
 ```
-docker exec -i mongo mongodump --db=IssueLabels --gzip --archive=mongodump-IssueLabels.archive
-docker cp mongo:mongodump-IssueLabels.archive ./mongodump-IssueLabels.archive
+docker exec -i mongo mongodump --db=MiningDesignDecisions --gzip --archive=mongodump-MiningDesignDecisions.archive
+docker cp mongo:mongodump-MiningDesignDecisions.archive ./mongodump-MiningDesignDecisions.archive
 ```
 
 ## JiraRepos
@@ -37,10 +37,10 @@ docker cp mongo:mongodump-JiraRepos.archive ./mongodump-JiraRepos.archive
 
 # Restore data
 
-## IssueLabels
+## MiningDesignDecisions
 ```
-docker cp ./mongodump-IssueLabels.archive mongo:/mongodump-IssueLabels.archive
-docker exec -i mongo mongorestore --gzip --archive=mongodump-IssueLabels.archive --nsFrom "IssueLabels.*" --nsTo "IssueLabels.*"
+docker cp ./mongodump-MiningDesignDecisions.archive mongo:/mongodump-MiningDesignDecisions.archive
+docker exec -i mongo mongorestore --gzip --archive=mongodump-MiningDesignDecisions.archive --nsFrom "MiningDesignDecisions.*" --nsTo "MiningDesignDecisions.*"
 ```
 
 ## JiraRepos

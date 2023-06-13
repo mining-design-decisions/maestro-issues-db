@@ -163,6 +163,33 @@ issue_links_collection_schema = {
 }
 
 
+repo_info_collection_schema = {
+    "$jsonSchema": {
+        "bsonType": "object",
+        "additionalProperties": False,
+        "properties": {
+            "_id": {"bsonType": "string", "description": "'_id' must be a string"},
+            "repo_url": {
+                "bsonType": "string",
+                "description": "'repo_url' must be a string",
+            },
+            "download_date": {
+                "bsonType": ["string", "null"],
+                "description": "'download_date' must be a string",
+            },
+            "batch_size": {
+                "bsonType": "int",
+                "description": "'batch_size' must be an int",
+            },
+            "query_wait_time_minutes": {
+                "bsonType": "double",
+                "description": "'query_wait_time_minutes' must be a double",
+            },
+        },
+    }
+}
+
+
 projects_collection_schema = {
     "$jsonSchema": {
         "bsonType": "object",

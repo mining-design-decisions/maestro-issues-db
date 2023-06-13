@@ -9,3 +9,5 @@ passlib[bcrypt]
 pytest
 httpx
 coverage
+requests
+jira
