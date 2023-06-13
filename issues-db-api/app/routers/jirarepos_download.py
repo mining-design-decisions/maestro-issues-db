@@ -93,6 +93,27 @@ def jira_repos_download(request: RequestIn, token=Depends(validate_token)):
             download_repo(repo_info, request)
 
 
+@router.get("", response_model=list[Repo])
+def get_repo_info():
+    """
+    Get the information about all the repos that are currently in the database.
+    :return:
+    """
+    repos = repo_info_collection.find({})
+    response = []
+    for repo in repos:
+        response.append(
+            Repo(
+                repo_name=repo["_id"],
+                repo_url=repo["repo_url"],
+                download_date=repo["download_date"],
+                batch_size=repo["batch_size"],
+                query_wait_time_minutes=repo["query_wait_time_minutes"],
+            )
+        )
+    return response
+
+
 @router.post("")
 def add_repo(request: Repo, token=Depends(validate_token)):
     """

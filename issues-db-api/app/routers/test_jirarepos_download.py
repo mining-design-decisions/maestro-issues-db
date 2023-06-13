@@ -26,6 +26,24 @@ def setup_db():
     )
 
 
+def test_get_repo_info():
+    restore_dbs()
+    setup_db()
+
+    # Get repo info
+    assert client.get("/jira-repos").json() == [
+        {
+            "repo_name": "name_of_repo",
+            "repo_url": "url_of_repo",
+            "download_date": None,
+            "batch_size": 1000,
+            "query_wait_time_minutes": 0.0,
+        }
+    ]
+
+    restore_dbs()
+
+
 def test_add_repo():
     restore_dbs()
     setup_users_db()
