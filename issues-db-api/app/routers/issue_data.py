@@ -59,6 +59,7 @@ def streaming_issue_data(request: IssueDataIn):
         # First part is the jira repo name, second part is the id
         ids[split_id[0]].append(split_id[1])
 
+    first_item = True
     for jira_name in jira_repos_db.list_collection_names():
         issue_link_prefix = issue_links_collection.find_one({"_id": jira_name})["link"]
         issues = jira_repos_db[jira_name].find(
@@ -124,7 +125,11 @@ def streaming_issue_data(request: IssueDataIn):
                 else:
                     # Use default value for attribute
                     attributes[attr] = default_value[attr]
-            yield f'"{jira_name}-{issue["id"]}": {json.dumps(attributes)},'
+            if first_item:
+                yield f'"{jira_name}-{issue["id"]}": {json.dumps(attributes)}'
+                first_item = False
+            else:
+                yield f',"{jira_name}-{issue["id"]}": {json.dumps(attributes)}'
         if remaining_ids:
             raise issues_not_found_exception(
                 [f"{jira_name}-{id_}" for id_ in remaining_ids]
