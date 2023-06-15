@@ -4,7 +4,6 @@ from app.dependencies import (
     issue_labels_collection,
     models_collection,
     jira_repos_db,
-    issue_links_collection,
     projects_collection,
     tags_collection,
     mining_add_db,
@@ -15,7 +14,6 @@ from app.dependencies import (
 )
 from app.schemas import (
     issue_labels_collection_schema,
-    issue_links_collection_schema,
     tags_collection_schema,
     projects_collection_schema,
     dl_models_collection_schema,
@@ -45,7 +43,6 @@ def restore_dbs():
     issue_labels_collection.drop()
     models_collection.drop()
     jira_repos_db["Apache"].drop()
-    issue_links_collection.drop()
     repo_info_collection.drop()
     projects_collection.drop()
     tags_collection.drop()
@@ -56,9 +53,6 @@ def restore_dbs():
 
     mining_add_db.create_collection(
         "IssueLabels", validator=issue_labels_collection_schema
-    )
-    mining_add_db.create_collection(
-        "IssueLinks", validator=issue_links_collection_schema
     )
     mining_add_db.create_collection("RepoInfo", validator=repo_info_collection_schema)
     mining_add_db.create_collection("Tags", validator=tags_collection_schema)

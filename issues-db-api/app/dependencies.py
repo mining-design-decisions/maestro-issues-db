@@ -3,7 +3,6 @@ from pymongo import MongoClient
 import gridfs
 from app.schemas import (
     issue_labels_collection_schema,
-    issue_links_collection_schema,
     tags_collection_schema,
     projects_collection_schema,
     dl_models_collection_schema,
@@ -23,7 +22,6 @@ mining_add_db = mongo_client["MiningDesignDecisions"]
 fs = gridfs.GridFS(mongo_client["MiningDesignDecisions"])
 
 issue_labels_collection = mongo_client["MiningDesignDecisions"]["IssueLabels"]
-issue_links_collection = mongo_client["MiningDesignDecisions"]["IssueLinks"]
 repo_info_collection = mongo_client["MiningDesignDecisions"]["RepoInfo"]
 tags_collection = mongo_client["MiningDesignDecisions"]["Tags"]
 projects_collection = mongo_client["MiningDesignDecisions"]["Projects"]
@@ -37,10 +35,6 @@ existing_collections = mining_add_db.list_collection_names()
 if "IssueLabels" not in existing_collections:
     mining_add_db.create_collection(
         "IssueLabels", validator=issue_labels_collection_schema
-    )
-if "IssueLinks" not in existing_collections:
-    mining_add_db.create_collection(
-        "IssueLinks", validator=issue_links_collection_schema
     )
 if "RepoInfo" not in existing_collections:
     mining_add_db.create_collection("RepoInfo", validator=repo_info_collection_schema)

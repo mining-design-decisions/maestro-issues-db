@@ -151,17 +151,6 @@ issue_labels_collection_schema = {
     }
 }
 
-issue_links_collection_schema = {
-    "$jsonSchema": {
-        "bsonType": "object",
-        "additionalProperties": False,
-        "properties": {
-            "_id": {"bsonType": "string", "description": "'_id' must be a string"},
-            "link": {"bsonType": "string", "description": "'link' must be a string"},
-        },
-    }
-}
-
 
 repo_info_collection_schema = {
     "$jsonSchema": {
@@ -184,6 +173,10 @@ repo_info_collection_schema = {
             "query_wait_time_minutes": {
                 "bsonType": "double",
                 "description": "'query_wait_time_minutes' must be a double",
+            },
+            "issue_link_prefix": {
+                "bsonType": "string",
+                "description": "'issue_link_prefix' must be a string",
             },
         },
     }

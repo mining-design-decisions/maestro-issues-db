@@ -2,8 +2,8 @@ import pytest
 from app.dependencies import (
     issue_labels_collection,
     jira_repos_db,
-    issue_links_collection,
     models_collection,
+    repo_info_collection,
 )
 from bson import ObjectId
 from fastapi import HTTPException
@@ -79,8 +79,15 @@ def setup_db():
         }
     )
 
-    issue_links_collection.insert_one(
-        {"_id": "Apache", "link": "https://issues.apache.org/jira"}
+    repo_info_collection.insert_one(
+        {
+            "_id": "Apache",
+            "repo_url": "url_of_repo",
+            "download_date": None,
+            "batch_size": 1000,
+            "query_wait_time_minutes": 0.0,
+            "issue_link_prefix": "https://issues.apache.org/jira",
+        }
     )
 
     return model_id, version_id, comment_id1, comment_id2

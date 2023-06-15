@@ -3,7 +3,7 @@ import json
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from app.dependencies import jira_repos_db, issue_links_collection
+from app.dependencies import jira_repos_db, repo_info_collection
 from app.exceptions import (
     get_attr_required_exception,
     duplicate_issue_exception,
@@ -61,7 +61,9 @@ def streaming_issue_data(request: IssueDataIn):
 
     first_item = True
     for jira_name in jira_repos_db.list_collection_names():
-        issue_link_prefix = issue_links_collection.find_one({"_id": jira_name})["link"]
+        issue_link_prefix = repo_info_collection.find_one({"_id": jira_name})[
+            "issue_link_prefix"
+        ]
         issues = jira_repos_db[jira_name].find(
             {"id": {"$in": ids[jira_name]}},
             ["id", "key"]
