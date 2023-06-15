@@ -61,9 +61,6 @@ def streaming_issue_data(request: IssueDataIn):
 
     first_item = True
     for jira_name in jira_repos_db.list_collection_names():
-        issue_link_prefix = repo_info_collection.find_one({"_id": jira_name})[
-            "issue_link_prefix"
-        ]
         issues = jira_repos_db[jira_name].find(
             {"id": {"$in": ids[jira_name]}},
             ["id", "key"]
@@ -74,8 +71,13 @@ def streaming_issue_data(request: IssueDataIn):
             ],
         )
 
+        issue_link_prefix = None
         remaining_ids = set(ids[jira_name])
         for issue in issues:
+            if issue_link_prefix is None:
+                issue_link_prefix = repo_info_collection.find_one({"_id": jira_name})[
+                    "issue_link_prefix"
+                ]
             if issue["id"] not in remaining_ids:
                 raise duplicate_issue_exception(jira_name, issue["id"])
             remaining_ids.remove(issue["id"])
