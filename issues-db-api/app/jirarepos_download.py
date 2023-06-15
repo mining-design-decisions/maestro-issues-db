@@ -3,7 +3,7 @@ from time import time  # To time the duration of the requests
 
 import requests  # To get the data
 import urllib3
-from app.dependencies import jira_repos_db
+from app.dependencies import jira_repos_db, issue_labels_collection
 from app.exceptions import url_not_working_exception
 from jira import JIRA
 
@@ -162,11 +162,39 @@ def download_and_write_data_mongo(
             or num_returned_issues == 0
         ):
             # Delete existing issues before updating
+            for issue in issues:
+                # Remove old tag
+                old_tag = collection.find_one({"id": issue["id"]})["key"].split("-")[0]
+                issue_labels_collection.update_one(
+                    {"_id": f"{jira_name}-{issue['id']}"},
+                    {"$pull": {"tags": f"{jira_name}-{old_tag}"}},
+                )
             ids = [issue["id"] for issue in issues]
             collection.delete_many({"id": {"$in": ids}})
 
             # Write the data to mongodb
             collection.insert_many(issues)
+            for issue in issues:
+                issue_label = issue_labels_collection(
+                    {"_id": f"{jira_name}-{issue['id']}"}
+                )
+                if issue_label is None:
+                    issue_labels_collection.insert_one(
+                        {
+                            "_id": f"{jira_name}-{issue['id']}",
+                            "existence": None,
+                            "property": None,
+                            "executive": None,
+                            "tags": [],
+                            "comments": {},
+                            "predictions": {},
+                        }
+                    )
+                new_tag = issue["key"].split("-")[0]
+                issue_labels_collection.update_one(
+                    {"_id": f"{jira_name}-{issue['id']}"},
+                    {"$addToSet": {"tags": f"{jira_name}-{new_tag}"}},
+                )
 
             print("... Issues written to database ...")
             last_write_start_index = start_index
