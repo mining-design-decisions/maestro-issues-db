@@ -65,6 +65,35 @@ def restore_dbs():
     mongo_client["Users"].create_collection("Users", validator=users_collection_schema)
 
 
+def setup_dbs():
+    restore_dbs()
+    setup_users_db()
+
+    jira_repos_db["Apache"].insert_one({"_id": 0, "key": "CASSANDRA-0"})
+
+    issue_labels_collection.insert_one(
+        {
+            "_id": "Apache-0",
+            "existence": None,
+            "property": None,
+            "executive": None,
+            "tags": ["Apache-CASSANDRA"],
+        }
+    )
+
+    projects_collection.insert_one(
+        {
+            "_id": "Apache-CASSANDRA",
+            "ecosystem": "Apache",
+            "key": "CASSANDRA",
+            "additional_properties": {
+                "property1": "value",
+                "property2": ["value1", "value2"],
+            },
+        }
+    )
+
+
 def get_auth_header():
     response = client.post(
         "/token", files={"username": (None, "test"), "password": (None, "test")}

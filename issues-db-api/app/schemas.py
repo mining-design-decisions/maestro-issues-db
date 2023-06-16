@@ -187,11 +187,19 @@ projects_collection_schema = {
     "$jsonSchema": {
         "bsonType": "object",
         "additionalProperties": False,
-        "required": ["repo", "project"],
+        "required": ["ecosystem", "key", "additional_properties"],
         "properties": {
             "_id": {"bsonType": "string", "description": "'_id' must be a string"},
-            "repo": {"bsonType": "string", "description": "'_id' must be a string"},
-            "project": {"bsonType": "string", "description": "'_id' must be a string"},
+            "ecosystem": {
+                "bsonType": "string",
+                "description": "'ecosystem' must be a string",
+            },
+            "key": {"bsonType": "string", "description": "'key' must be a string"},
+            "additional_properties": {
+                "bsonType": "object",
+                "additionalProperties": True,
+                "description": "'additional_properties' must be an object",
+            },
         },
     }
 }

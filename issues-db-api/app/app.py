@@ -5,6 +5,7 @@ from .routers import (
     issue_ids,
     manual_labels,
     models,
+    projects,
     issues,
     jirarepos_download,
     authentication,
@@ -30,6 +31,7 @@ app.include_router(issues.router)
 app.include_router(jirarepos_download.router)
 app.include_router(manual_labels.router)
 app.include_router(models.router)
+app.include_router(projects.router)
 app.include_router(repos.router)
 app.include_router(tags.router)
 app.include_router(ui.router)
