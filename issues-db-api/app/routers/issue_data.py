@@ -60,6 +60,8 @@ def streaming_issue_data(request: IssueDataIn):
         ids[split_id[0]].append(split_id[1])
 
     first_item = True
+    buffer = ""
+    buffer_size = 0
     for jira_name in jira_repos_db.list_collection_names():
         issues = jira_repos_db[jira_name].find(
             {"id": {"$in": ids[jira_name]}},
@@ -130,15 +132,19 @@ def streaming_issue_data(request: IssueDataIn):
                     # Use default value for attribute
                     attributes[attr] = default_value[attr]
             if first_item:
-                yield f'"{jira_name}-{issue["id"]}": {json.dumps(attributes)}'
+                buffer += f'"{jira_name}-{issue["id"]}": {json.dumps(attributes)}'
                 first_item = False
             else:
-                yield f',"{jira_name}-{issue["id"]}": {json.dumps(attributes)}'
+                buffer += f',"{jira_name}-{issue["id"]}": {json.dumps(attributes)}'
+            buffer_size += 1
+            if buffer_size > 1000:
+                yield buffer
+                buffer_size = 0
         if remaining_ids:
             raise issues_not_found_exception(
                 [f"{jira_name}-{id_}" for id_ in remaining_ids]
             )
-    yield "}}"
+    yield buffer + "}}"
 
 
 @router.get("", response_model=IssueDataOut)
