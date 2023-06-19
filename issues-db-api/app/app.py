@@ -12,6 +12,7 @@ from .routers import (
     embeddings,
     ui,
     repos,
+    statistics,
     bulk,
     files,
 )
@@ -33,6 +34,7 @@ app.include_router(manual_labels.router)
 app.include_router(models.router)
 app.include_router(projects.router)
 app.include_router(repos.router)
+app.include_router(statistics.router)
 app.include_router(tags.router)
 app.include_router(ui.router)
 app.include_router(ui_updates.router)
