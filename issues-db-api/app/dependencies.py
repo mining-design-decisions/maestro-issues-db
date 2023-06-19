@@ -28,7 +28,7 @@ projects_collection = mongo_client["MiningDesignDecisions"]["Projects"]
 models_collection = mongo_client["MiningDesignDecisions"]["DLModels"]
 embeddings_collection = mongo_client["MiningDesignDecisions"]["DLEmbeddings"]
 files_collection = mongo_client["MiningDesignDecisions"]["Files"]
-statistics_collection = models_collection["Statistics"]["Statistics"]
+statistics_collection = mongo_client["Statistics"]["Statistics"]
 users_collection = mongo_client["Users"]["Users"]
 
 # Create non-existing collections with schema validation
