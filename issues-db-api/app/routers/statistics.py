@@ -75,7 +75,10 @@ def calculate_statistics(token=Depends(validate_token)):
             created = get_value(issue["fields"], "created")
             resolutiondate = get_value(issue["fields"], "resolutiondate")
             subtasks = get_value(issue["fields"], "subtasks")
-            hierarchy = [f"{repo}-{subtask['id']}" for subtask in subtasks]
+            if subtasks is not None:
+                hierarchy = [f"{repo}-{subtask['id']}" for subtask in subtasks]
+            else:
+                hierarchy = []
             status = get_value(issue["fields"], "status/name")
             labels = get_value(issue["fields"], "labels")
             attachments = get_value(issue["fields"], "attachment")
@@ -97,22 +100,25 @@ def calculate_statistics(token=Depends(validate_token)):
             if comments is None:
                 comments = []
             comments = [comment["body"] for comment in comments]
-            statistics_collection.insert_one(
+            statistics_collection.update_one(
+                {"_id": f"{repo}-{issue['id']}"},
                 {
-                    "_id": f"{repo}-{issue['id']}",
-                    "issue_type": issue_type,
-                    "resolution": resolution,
-                    "created": created,
-                    "resolutiondate": resolutiondate,
-                    "hierarchy": hierarchy,
-                    "status": status,
-                    "labels": labels,
-                    "num_pdf_attachments": num_pdf_attachments,
-                    "num_attachments": num_attachments,
-                    "watches": watches,
-                    "votes": votes,
-                    "summary": summary,
-                    "description": description,
-                    "comments": comments,
-                }
+                    "$set": {
+                        "issue_type": issue_type,
+                        "resolution": resolution,
+                        "created": created,
+                        "resolutiondate": resolutiondate,
+                        "hierarchy": hierarchy,
+                        "status": status,
+                        "labels": labels,
+                        "num_pdf_attachments": num_pdf_attachments,
+                        "num_attachments": num_attachments,
+                        "watches": watches,
+                        "votes": votes,
+                        "summary": summary,
+                        "description": description,
+                        "comments": comments,
+                    }
+                },
+                upsert=True,
             )
