@@ -30,6 +30,10 @@ class Statistic(BaseModel):
     comments: list[str] | None
 
 
+class Statistics(BaseModel):
+    data = dict[str, Statistic]
+
+
 def get_value(fields, path):
     current_item = fields
     keys = path.split("/")
@@ -41,7 +45,7 @@ def get_value(fields, path):
 
 
 def stream_statistics(issues):
-    yield "{"
+    yield '{"data": {'
 
     first_item = True
     for issue in issues:
@@ -53,10 +57,10 @@ def stream_statistics(issues):
         else:
             yield f',"{issue_id}": {json.dumps(issue)}'
 
-    yield "}"
+    yield "}}"
 
 
-@router.get("", response_model={str, Statistic})
+@router.get("", response_model=Statistics)
 def get_statistics(request: Filter):
     issues = statistics_collection.find({"_id": {"$in": request.issue_ids}})
     return StreamingResponse(stream_statistics(issues), media_type="text/event-stream")
