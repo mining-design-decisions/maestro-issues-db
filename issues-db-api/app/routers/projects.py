@@ -22,14 +22,14 @@ def fix_tags():
     tags_to_remove = set()
 
     # Get current projects
-    for project in projects_collection:
+    for project in projects_collection.find({}):
         tags = get_tags(project)
         tags_per_project[f"{project['ecosystem']}-{project['key']}"] = tags
         tags_to_remove = tags_to_remove.union(set(tags))
 
     # Find tags to add and remove
     for ecosystem in jira_repos_db.list_collection_names():
-        for issue in jira_repos_db[ecosystem]:
+        for issue in jira_repos_db[ecosystem].find({}):
             key = issue["key"].split("-")[0]
             if f"{ecosystem}-{key}" not in tags_per_project:
                 project = {
@@ -44,12 +44,12 @@ def fix_tags():
 
     # Remove old tags first
     issue_labels_collection.update_many(
-        {}, {"$pull": {"tags": {"$each": list(tags_to_remove)}}}
+        {}, {"$pull": {"tags": {"$in": list(tags_to_remove)}}}
     )
 
     # Add new tags
     for ecosystem in jira_repos_db.list_collection_names():
-        for issue in jira_repos_db[ecosystem]:
+        for issue in jira_repos_db[ecosystem].find({}):
             key = issue["key"].split("-")[0]
             issue_labels_collection.update_one(
                 {"_id": f"{ecosystem}-{issue['id']}"},
