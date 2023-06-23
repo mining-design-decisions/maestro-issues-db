@@ -280,6 +280,20 @@ def get_model_version(model_id: str, version_id: str):
     raise version_not_found_exception(version_id, model_id)
 
 
+@router.put("/{model_id}/versions/{version_id}")
+def replace_model_version_file(
+    model_id: str,
+    version_id: str,
+    file: UploadFile = Form(),
+    # token=Depends(validate_token),
+):
+    """
+    Upload a new version for the given model-id.
+    """
+    fs.delete(ObjectId(version_id))
+    fs.put(file.file, _id=ObjectId(version_id), filename=file.filename)
+
+
 @router.delete("/{model_id}/versions/{version_id}")
 def delete_model_version(model_id: str, version_id: str, token=Depends(validate_token)):
     result = models_collection.update_one(
