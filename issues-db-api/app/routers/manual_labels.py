@@ -74,7 +74,7 @@ def _update_comment(issue_id: str, comment_id: str, username: str, update: dict)
             raise issue_not_found_exception(issue_id)
         elif "comments" not in issue or comment_id not in issue["comments"]:
             raise comment_not_found_exception(comment_id, issue_id)
-        else:
+        elif issue["comments"][comment_id]["author"] != username:
             raise comment_author_exception(comment_id, issue_id)
 
 
