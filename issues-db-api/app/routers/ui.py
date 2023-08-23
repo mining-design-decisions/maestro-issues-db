@@ -115,15 +115,6 @@ def get_ui_data(request: Query):
             raise version_not_found_exception(version_id, model_id)
 
     if request.sort is not None:
-        predictions_found = False
-        indexes = issue_labels_collection.index_information()
-        for key, value in indexes.items():
-            for col in value["key"]:
-                if col[0] == request.sort:
-                    predictions_found = True
-                    break
-        if not predictions_found:
-            raise ui_sort_exception(request.sort)
         sort_direction = 1 if request.sort_ascending else -1
         issues = (
             issue_labels_collection.find(request.filter)
