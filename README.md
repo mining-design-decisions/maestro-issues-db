@@ -17,7 +17,7 @@ Get your OpenSSL secret:
 openssl rand -hex 32
 ```
 
-Open the following file:
+Create and open the following file:
 ```
 nano issues-db-api/app/config.py
 ```
