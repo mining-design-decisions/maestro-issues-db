@@ -244,6 +244,7 @@ def download_multiprocessed(
             num_available_results,
             enable_auth,
         )
+        start_index += batch_size
         sleep(query_wait_time_minutes)
     download_and_write_data_mongo(
         jira_name,
