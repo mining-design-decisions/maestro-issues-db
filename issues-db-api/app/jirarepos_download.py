@@ -164,7 +164,10 @@ def download_and_write_data_mongo(
             # Delete existing issues before updating
             for issue in issues:
                 # Remove old tag
-                old_tag = collection.find_one({"id": issue["id"]})["key"].split("-")[0]
+                old_issue = collection.find_one({"id": issue["id"]})
+                if not old_issue:
+                    continue
+                old_tag = old_issue["key"].split("-")[0]
                 issue_labels_collection.update_one(
                     {"_id": f"{jira_name}-{issue['id']}"},
                     {"$pull": {"tags": f"{jira_name}-{old_tag}"}},
@@ -175,7 +178,7 @@ def download_and_write_data_mongo(
             # Write the data to mongodb
             collection.insert_many(issues)
             for issue in issues:
-                issue_label = issue_labels_collection(
+                issue_label = issue_labels_collection.find_one(
                     {"_id": f"{jira_name}-{issue['id']}"}
                 )
                 if issue_label is None:
