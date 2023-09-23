@@ -1,6 +1,8 @@
 # Maestro Issues Database (API)
 This repository contains the issues database and its API of Maestro. The Mongo archives can be downloaded from here:
-https://zenodo.org/record/8225601
+[https://zenodo.org/record/8225601](https://zenodo.org/record/8372644). Note that this version also contains a lite
+variant of the MiningDesignDecisions archive. This lite variant only contains the best trained model (BERT) and no
+other files or embeddings.
 
 ## Setup
 The setup process is described below. Note that, because it uses HTTPS, it needs an SSL certificate (fullchain.pem and
