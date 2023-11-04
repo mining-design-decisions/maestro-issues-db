@@ -2,15 +2,50 @@ from datetime import datetime, timedelta
 
 from app.config import SECRET_KEY
 from app.dependencies import users_collection
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm, OAuth2
+from fastapi.security.utils import get_authorization_scheme_param
+from fastapi.openapi.models import OAuthFlows as OAuthFlowsModel
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
 from pymongo.errors import DuplicateKeyError
+from typing import Optional, Dict
 
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 1440
+
+
+class OAuth2PasswordBearerWithCookie(OAuth2):
+    def __init__(
+        self,
+        tokenUrl: str,
+        scheme_name: Optional[str] = None,
+        scopes: Optional[Dict[str, str]] = None,
+        auto_error: bool = True,
+    ):
+        if not scopes:
+            scopes = {}
+        flows = OAuthFlowsModel(password={"tokenUrl": tokenUrl, "scopes": scopes})
+        super().__init__(flows=flows, scheme_name=scheme_name, auto_error=auto_error)
+
+    async def __call__(self, request: Request) -> Optional[str]:
+        if request.headers.get("Authorization"):
+            authorization: str = request.headers.get("Authorization")
+        else:
+            authorization: str = request.cookies.get("access_token")  #changed to accept access token from httpOnly Cookie
+        
+        scheme, param = get_authorization_scheme_param(authorization)
+        if not authorization or scheme.lower() != "bearer":
+            if self.auto_error:
+                raise HTTPException(
+                    status_code=HTTP_401_UNAUTHORIZED,
+                    detail="Not authenticated",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            else:
+                return None
+        return param
 
 
 class Token(BaseModel):
@@ -28,7 +63,7 @@ class Password(BaseModel):
 
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+oauth2_scheme = OAuth2PasswordBearerWithCookie(tokenUrl="token")
 router = APIRouter(tags=["authentication"])
 
 
@@ -86,7 +121,7 @@ def validate_token(token: str = Depends(oauth2_scheme)):
 
 
 @router.post("/token", response_model=Token)
-def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+def login_for_access_token(response: Response, form_data: OAuth2PasswordRequestForm = Depends()):
     """
     Provide your username and password as form data to get an access token.
     """
@@ -94,17 +129,27 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
     if username is None:
         raise CREDENTIALS_EXCEPTION
     access_token = create_access_token(data={"username": username})
+    response.set_cookie(key="access_token",
+                        value=f"bearer {access_token}",
+                        httponly=True,
+                        secure=False,
+                        samesite="none")
     return {"access_token": access_token, "token_type": "bearer"}
 
 
 @router.post("/refresh-token", response_model=Token)
-def refresh_token(token=Depends(validate_token)):
+def refresh_token(response: Response, token=Depends(validate_token)):
     """
     Endpoint for refreshing your access token.
     :param token: current access token
     :return: refreshed token
     """
     access_token = create_access_token(token)
+    response.set_cookie(key="access_token",
+                        value=f"bearer {access_token}",
+                        httponly=True,
+                        secure=False,
+                        samesite="none")
     return {"access_token": access_token, "token_type": "bearer"}
 
 

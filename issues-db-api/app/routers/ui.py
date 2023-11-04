@@ -95,7 +95,7 @@ class UIDataOut(BaseModel):
         }
 
 
-@router.get("", response_model=UIDataOut)
+@router.post("", response_model=UIDataOut)
 def get_ui_data(request: Query):
     page = request.page - 1
     limit = request.limit
