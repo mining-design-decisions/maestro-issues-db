@@ -51,6 +51,7 @@ class OAuth2PasswordBearerWithCookie(OAuth2):
 class Token(BaseModel):
     access_token: str
     token_type: str
+    username: str
 
 
 class User(BaseModel):
@@ -134,7 +135,7 @@ def login_for_access_token(response: Response, form_data: OAuth2PasswordRequestF
                         httponly=True,
                         secure=False,
                         samesite="none")
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {"access_token": access_token, "token_type": "bearer", "username": username}
 
 
 @router.post("/refresh-token", response_model=Token)
@@ -150,7 +151,7 @@ def refresh_token(response: Response, token=Depends(validate_token)):
                         httponly=True,
                         secure=False,
                         samesite="none")
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {"access_token": access_token, "token_type": "bearer", "username": token["username"]}
 
 
 @router.post("/create-account")
