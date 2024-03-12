@@ -1,5 +1,4 @@
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from .routers import (
     tags,
     issue_data,
@@ -21,14 +20,7 @@ from .streaming import ui_updates
 from .config import SSL_KEYFILE, SSL_CERTFILE
 import uvicorn
 
-app = FastAPI()
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app = FastAPI(root_path="/issues-db-api")
 
 app.include_router(authentication.router)
 app.include_router(bulk.router)
@@ -53,6 +45,4 @@ def run_app():
         app,
         host="0.0.0.0",
         port=8000,
-        ssl_keyfile=SSL_KEYFILE,
-        ssl_certfile=SSL_CERTFILE,
     )
