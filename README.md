@@ -50,14 +50,14 @@ docker exec -i mongo mongorestore --gzip --archive=mongodump-MiningDesignDecisio
 
 (Optional) In case you want to dump the data from the JiraRepos database:
 ```
-docker exec -i mongo mongodump --db=MiningDesignDecisions --gzip --archive=mongodump-MiningDesignDecisions.archive
-docker cp mongo:mongodump-MiningDesignDecisions.archive ./mongodump-MiningDesignDecisions.archive
+docker exec -i mongo mongodump --db=JiraRepos --gzip --archive=mongodump-JiraRepos.archive
+docker cp mongo:mongodump-JiraRepos.archive ./mongodump-JiraRepos.archive
 ```
 
 (Optional) In case you want to dump the data from the MiningDesignDecisions database:
 ```
-docker exec -i mongo mongodump --db=JiraRepos --gzip --archive=mongodump-JiraRepos.archive
-docker cp mongo:mongodump-JiraRepos.archive ./mongodump-JiraRepos.archive
+docker exec -i mongo mongodump --db=MiningDesignDecisions --gzip --archive=mongodump-MiningDesignDecisions.archive
+docker cp mongo:mongodump-MiningDesignDecisions.archive ./mongodump-MiningDesignDecisions.archive
 ```
 
 ## VM Setup (debian 11)
