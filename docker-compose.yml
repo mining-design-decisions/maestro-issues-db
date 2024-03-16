@@ -43,11 +43,13 @@ services:
       - MONGO_URL=mongodb://mongo:27017
       - DOCKER=True
     labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.issues-db-api.rule=Host(`docker.localhost`)"
       - "traefik.http.routers.issues-db-api.rule=PathPrefix(`/issues-db-api`)"
+      - "traefik.http.routers.issues-db-api.entrypoints=websecure"
+      - "traefik.http.routers.issues-db-api.tls=true"
       - "traefik.http.routers.issues-db-api.middlewares=issues-db-api"
       - "traefik.http.middlewares.issues-db-api.stripprefix.prefixes=/issues-db-api"
-      - "traefik.http.routers.issues-db-api.entrypoints=web"
-      - "traefik.enable=true"
 
   backup-issues-db:
     container_name: backup-issues-db

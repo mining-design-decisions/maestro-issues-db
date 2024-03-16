@@ -17,7 +17,6 @@ from .routers import (
     files,
 )
 from .streaming import ui_updates
-from .config import SSL_KEYFILE, SSL_CERTFILE
 import uvicorn
 
 app = FastAPI(root_path="/issues-db-api")
