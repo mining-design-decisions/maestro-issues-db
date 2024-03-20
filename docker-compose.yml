@@ -1,21 +1,35 @@
 version: "3.1"
 services:
+  psql:
+    image: postgres
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=issues
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=pass
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+
   mongo:
     container_name: mongo
     image: mongo
+    restart: always
     ports:
       - "27017:27017"
     volumes:
-    - ./data:/data/db
+      - ./data:/data/db
     networks:
-      - issues-db
+      - maestro_traefik
 
   mongo-express:
     image: mongo-express
+    restart: always
     ports:
       - "8081:8081"
     networks:
-      - issues-db
+      - maestro_traefik
 
   issues-db-api:
     container_name: issues-db-api
@@ -24,10 +38,18 @@ services:
     ports:
       - "8000:8000"
     networks:
-      - issues-db
+      - maestro_traefik
     environment:
       - MONGO_URL=mongodb://mongo:27017
       - DOCKER=True
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.issues-db-api.rule=Host(`docker.localhost`)"
+      - "traefik.http.routers.issues-db-api.rule=PathPrefix(`/issues-db-api`)"
+      - "traefik.http.routers.issues-db-api.entrypoints=websecure"
+      - "traefik.http.routers.issues-db-api.tls=true"
+      - "traefik.http.routers.issues-db-api.middlewares=issues-db-api"
+      - "traefik.http.middlewares.issues-db-api.stripprefix.prefixes=/issues-db-api"
 
   backup-issues-db:
     container_name: backup-issues-db
@@ -37,5 +59,5 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
 
 networks:
-  issues-db:
-    driver: bridge
+  maestro_traefik:
+    external: true

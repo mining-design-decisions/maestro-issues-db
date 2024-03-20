@@ -17,10 +17,9 @@ from .routers import (
     files,
 )
 from .streaming import ui_updates
-from .config import SSL_KEYFILE, SSL_CERTFILE
 import uvicorn
 
-app = FastAPI()
+app = FastAPI(root_path="/issues-db-api")
 
 app.include_router(authentication.router)
 app.include_router(bulk.router)
@@ -45,6 +44,4 @@ def run_app():
         app,
         host="0.0.0.0",
         port=8000,
-        ssl_keyfile=SSL_KEYFILE,
-        ssl_certfile=SSL_CERTFILE,
     )
