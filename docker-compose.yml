@@ -44,7 +44,7 @@ services:
       - DOCKER=True
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.issues-db-api.rule=Host(`docker.localhost`)"
+      - "traefik.http.routers.issues-db-api.rule=Host(`maestro.localhost`)"
       - "traefik.http.routers.issues-db-api.rule=PathPrefix(`/issues-db-api`)"
       - "traefik.http.routers.issues-db-api.entrypoints=websecure"
       - "traefik.http.routers.issues-db-api.tls=true"
