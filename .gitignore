@@ -135,3 +135,6 @@ server.crt
 server.key
 fullchain.pem
 privkey.pem
+
+
+postgres-data/
