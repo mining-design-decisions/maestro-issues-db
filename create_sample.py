@@ -1,50 +1,18 @@
 import pymongo
 import json
-from bson import ObjectId
 
 # MongoDB connection details
 mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
+labels_db = mongo_client["JiraRepos"]
+labels_collection = labels_db["Apache"]
 
-# Issue collection details
-issue_db = mongo_client["JiraRepos"]
-issue_collection = issue_db["Apache"]
+# Fetch a sample of 300 documents
+sample_size = 300
+pipeline = [{"$sample": {"size": sample_size}}]
+sample_documents = list(labels_collection.aggregate(pipeline))
 
-# IssueLabels collection details
-labels_db = mongo_client["MiningDesignDecisions"]
-labels_collection = labels_db["IssueLabels"]
+# Save the sample to a JSON file
+with open('sample_300.json', 'w') as json_file:
+    json.dump(sample_documents, json_file, default=str, indent=4)
 
-# Aggregation pipeline
-pipeline = [
-    {"$sample": {"size": 300}},
-    {
-        "$lookup": {
-            "from": "IssueLabels",
-            "localField": "key",
-            "foreignField": "_id",
-            "as": "issueDetails"
-        }
-    },
-    {"$unwind": {"path": "$issueDetails", "preserveNullAndEmptyArrays": True}}
-]
-
-# Run aggregation
-result = list(issue_collection.aggregate(pipeline))
-
-# Convert ObjectId to string for JSON serialization
-def convert_objectid(data):
-    if isinstance(data, list):
-        return [convert_objectid(item) for item in data]
-    elif isinstance(data, dict):
-        return {key: convert_objectid(value) for key, value in data.items()}
-    elif isinstance(data, ObjectId):
-        return str(data)
-    else:
-        return data
-
-result = convert_objectid(result)
-
-# Export to JSON
-with open("joined_data.json", "w") as json_file:
-    json.dump(result, json_file, indent=4)
-
-print("Data has been exported to joined_data.json")
+print(f"A sample of {sample_size} documents has been saved to 'sample_300.json'.")
