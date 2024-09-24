@@ -6,10 +6,11 @@ import os
 cwd = os.getcwd()
 print(cwd)
 # Read the JSON file
-with open("sample_300.json", "r") as json_file:
+with open("sampleApache.json", "r") as json_file:
     data = json.load(json_file)
 
-
+# mongo_keys = [item["key"] for item in data]
+# print(mongo_keys)
 
 mongo_issues_ids = ["Apache-"+ item['id'] for item in data]
 
@@ -99,6 +100,6 @@ for item in data:
         "comments_predictions":comments_predictions
     })
 
-with open('sample_data.json', 'w') as json_file:
+with open('sample_apache_data.json', 'w') as json_file:
     json.dump(new_data, json_file, default=str, indent=4)
 

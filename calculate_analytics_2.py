@@ -2,7 +2,7 @@ import json
 from collections import defaultdict
 
 # Load the JSON data from the file
-with open('sample_data.json', 'r') as file:
+with open('sample_apache_data.json', 'r') as file:
     data = json.load(file)
 
 # Define possible prediction values
